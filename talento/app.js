@@ -602,9 +602,9 @@
     ];
     if (c.tel_extra) L.push("item1.TEL:+52" + c.tel_extra, "item1.X-ABLabel:Otro número");
     if (c.correo && !/notengo/i.test(c.correo)) L.push(`EMAIL;TYPE=INTERNET,HOME:${vesc(c.correo)}`);
-    // Liga directa al chat de WhatsApp, con el mensaje elegido arriba ya escrito
-    L.push(`item2.URL:${wa(c)}`, "item2.X-ABLabel:WhatsApp");
-    if (c.tel_extra) L.push(`item3.URL:${wa(c, c.tel_extra)}`, "item3.X-ABLabel:WhatsApp otro número");
+    // Liga directa al chat de WhatsApp, sin mensaje: el contacto es independiente del tablero
+    L.push(`item2.URL:https://wa.me/52${c.celular}`, "item2.X-ABLabel:WhatsApp");
+    if (c.tel_extra) L.push(`item3.URL:https://wa.me/52${c.tel_extra}`, "item3.X-ABLabel:WhatsApp otro número");
     if (c.colonia) L.push(`ADR;TYPE=HOME:;;${vesc(c.colonia)};;;;México`);
     if (/^\d{4}-\d{2}-\d{2}$/.test(c.nacimiento || "")) L.push(`BDAY:${c.nacimiento}`);
     L.push(`NOTE:${vesc(notaContacto(c))}`, `CATEGORIES:Talento,${vesc(PC(c).nombre)}`, `UID:talento-${c.id}`, `REV:${ahora}`, "END:VCARD");
