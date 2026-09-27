@@ -384,7 +384,7 @@
     const ult = (c) => { const e = c.envios_detalle || []; return e[c.destacado ?? -1] || e[e.length - 1] || c; };
     return `
     <div class="fc-hero"><div class="fc-hero-in">
-      <div class="fc-nav"><button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver a la lista</span></button><span class="fc-pos">${P().nombre}</span><button class="btn btn-verde btn-chico" data-pdf="comparar">⬇ <span>PDF</span></button></div>
+      <div class="fc-nav"><button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver</span><span class="solo-escritorio"> a la lista</span></button><span class="fc-pos">${P().nombre}</span><button class="btn btn-contorno-claro btn-chico" data-pdf="comparar">⬇ <span>PDF</span></button></div>
       <div class="eyebrow">Lado a lado</div>
       <h1 class="cmp-h1">Comparar ${cs.length} finalistas</h1>
       <p class="hero-sub">Lo más fuerte de cada una aparece marcado en verde. La de mayor puntaje lleva la corona.</p>
@@ -529,6 +529,93 @@
       haciendoPDF = false;
     }
   }
+  /* ─── RLR · contacto vCard 3.0 (el mismo formato del sistema comercial) ─── */
+  const PREFIJO = { domestica: "ED", guia: "GP" }; // Empleado Doméstico · Guía Pedagógica
+  const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y"]);
+  function partirNombre(nombre) {
+    const w = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+    if (w.length <= 1) return { nombres: w.join(" "), apellidos: "" };
+    const cuantos = w.length === 2 ? 1 : 2;       // en México: apellido paterno y materno al final
+    let i = w.length - cuantos;
+    while (i > 1 && PARTICULAS.has(w[i - 1].toLowerCase())) i--; // «de la Hoya»
+    return { nombres: w.slice(0, i).join(" "), apellidos: w.slice(i).join(" ") };
+  }
+  const vesc = (t) => String(t ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+  // Dobla líneas a 75 bytes sin partir acentos (RFC 2425)
+  function doblar(linea) {
+    const enc = new TextEncoder(); const partes = []; let actual = "", bytes = 0, limite = 75;
+    for (const ch of linea) {
+      const b = enc.encode(ch).length;
+      if (bytes + b > limite) { partes.push(actual); actual = ""; bytes = 0; limite = 74; }
+      actual += ch; bytes += b;
+    }
+    partes.push(actual);
+    return partes.join("\r\n ");
+  }
+  const SI_NO = (v) => (String(v || "").toLowerCase().startsWith("s") ? "Sí" : v ? "No" : "—");
+  function notaContacto(c) {
+    const e = (c.envios_detalle || [])[c.destacado ?? -1] || (c.envios_detalle || []).slice(-1)[0] || c;
+    const m = st.marcas[c.id] || {};
+    const v = veredicto(c);
+    const lineas = [
+      `Talento · ${PC(c).nombre}`,
+      `${c.lugar ? `Lugar ${c.lugar} de ${st.total}` : "Nueva"} · ${c.puntos ?? "—"}/100 · ${v.largo}`,
+      `Solicitud: ${fecha(c.ultimo_envio)}${c.envios > 1 ? ` · llenó ${c.envios} veces` : ""}`,
+      "",
+      "NUESTRA LECTURA",
+      c.resumen || "—",
+      `Lo que la hace brillar: ${c.a_favor || "—"}`,
+      `Lo que hay que confirmar: ${c.a_cuidar || "—"}`,
+      c.preguntar ? `Pregunta para la llamada: ${c.preguntar}` : "",
+      "",
+      `CALIFICACIÓN: ${PC(c).medidores.map(([n, k, max]) => `${n} ${c[k] ?? 0}/${max}`).join(" · ")}`,
+      "",
+      "SUS RESPUESTAS",
+    ];
+    const qa = c.puesto === "guia" ? [
+      ["¿Cómo organizaría una tarde de 4 horas?", e.tarde], ["¿Qué hace si la niña se frustra o llora?", e.frustracion],
+      ["¿Qué significa acompañar su desarrollo?", e.desarrollo], ["Una experiencia real con niños pequeños", e.exp_ninos],
+      ["¿Qué es ser confiable dentro de un hogar?", e.confianza],
+    ] : [
+      ["¿Se queda a dormir de lunes a jueves?", SI_NO(c.dormir)], ["¿Entra lunes 8–9 y sale viernes 5–7?", SI_NO(c.horario)],
+      ["Años en casas particulares", c.experiencia], ["¿Le gusta convivir con niños de 4 años?", SI_NO(c.ninos)],
+      ["¿Tranquila y respetuosa en casa ajena?", SI_NO(c.tranquila)], ["Tres comidas que cocina muy bien", e.comidas],
+      ["Lo primero que limpia y por qué", e.limpia], ["Por qué es la mejor para el puesto", e.porque],
+    ];
+    for (const [pr, r] of qa) lineas.push(`${pr}`, `R: ${r || "—"}`, "");
+    lineas.push(`Colonia: ${c.colonia || "—"}`, `Referida por: ${c.referido || "—"}`);
+    if (m.estado) lineas.push(`Estado en la casa: ${(ESTADOS.find((x) => x[0] === m.estado) || ["", m.estado])[1].replace("★ ", "")}`);
+    if (m.nota) lineas.push("", "NOTAS DE LA CASA", m.nota);
+    return lineas.filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n").trim();
+  }
+  function vcard(c) {
+    const pre = PREFIJO[c.puesto] || "ED";
+    const { nombres, apellidos } = partirNombre(c.nombre);
+    const ahora = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+    const L = [
+      "BEGIN:VCARD", "VERSION:3.0",
+      `N:${vesc(apellidos)};${vesc(`${pre} ${nombres}`)};;;`,
+      `FN:${vesc(`${pre} ${c.nombre}`)}`,
+      `ORG:Talento;${vesc(PC(c).nombre)}`,
+      `TITLE:${vesc(`Candidata a ${PC(c).nombre.toLowerCase()}`)}`,
+      `TEL;TYPE=CELL,VOICE,pref:+52${c.celular}`,
+    ];
+    if (c.tel_extra) L.push("item1.TEL:+52" + c.tel_extra, "item1.X-ABLabel:Otro número");
+    if (c.correo && !/notengo/i.test(c.correo)) L.push(`EMAIL;TYPE=INTERNET,HOME:${vesc(c.correo)}`);
+    L.push(`item2.URL:https://wa.me/52${c.celular}`, "item2.X-ABLabel:WhatsApp");
+    if (c.colonia) L.push(`ADR;TYPE=HOME:;;${vesc(c.colonia)};;;;México`);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(c.nacimiento || "")) L.push(`BDAY:${c.nacimiento}`);
+    L.push(`NOTE:${vesc(notaContacto(c))}`, `CATEGORIES:Talento,${vesc(PC(c).nombre)}`, `UID:talento-${c.id}`, `REV:${ahora}`, "END:VCARD");
+    return L.map(doblar).join("\r\n") + "\r\n";
+  }
+  function descargarContacto(id) {
+    const c = st.porId[id]; if (!c) return;
+    const nombre = nombreArchivo(`${PREFIJO[c.puesto] || "ED"} ${c.nombre}`).replace(/\.pdf$/, ".vcf");
+    const url = URL.createObjectURL(new Blob([vcard(c)], { type: "text/vcard;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    aviso(`Contacto de ${primer(c.nombre)} listo para guardar`);
+  }
   let porContratar = null;
   function pedirContratar(id, x, y) {
     const c = st.porId[id]; if (!c) return;
@@ -602,11 +689,11 @@
     return `
     <div class="fc-hero"><div class="fc-hero-in">
       <div class="fc-nav">
-        <button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver a la lista</span></button>
+        <button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver</span><span class="solo-escritorio"> a la lista</span></button>
         ${ant ? `<button class="btn btn-contorno-claro" data-abrir="${ant.id}" aria-label="Anterior">‹ <span>Anterior</span></button>` : ""}
         ${sig ? `<button class="btn btn-contorno-claro" data-abrir="${sig.id}" aria-label="Siguiente"><span>Siguiente</span> ›</button>` : ""}
-        <span class="fc-pos">${c.lugar ? `Lugar ${c.lugar} de ${st.total}` : "Nueva"}</span>
-        <button class="btn btn-verde btn-chico" data-pdf="ficha" data-id="${c.id}">⬇ <span>PDF</span></button>
+        <span class="fc-pos" title="Lugar ${c.lugar ?? "—"} de ${st.total}">${c.lugar ? `${c.lugar}/${st.total}` : "Nueva"}</span>
+        <button class="btn btn-contorno-claro btn-chico" data-pdf="ficha" data-id="${c.id}">⬇ <span>PDF</span></button>
       </div>
       <div class="fc-top">
         <div>
@@ -622,6 +709,7 @@
             ${waBoton(c, "btn-verde", `${ICONO_WA}WhatsApp ${tel(c.celular)}`)}
             <a class="btn btn-contorno-claro" href="tel:+52${c.celular}">${ICONO_TEL}Llamar</a>
             ${c.tel_extra ? `<a class="btn btn-contorno-claro" href="tel:+52${c.tel_extra}">${ICONO_TEL}Otro número ${tel(c.tel_extra)}</a>` : ""}
+            <button class="btn btn-contorno-claro" data-vcf="${c.id}">⬇ Guardar contacto</button>
             ${botonComparar(c, true)}
           </div>
         </div>
@@ -871,6 +959,8 @@
     if (t.id === "btn-editar-mensaje") { editarMensaje(); return; }
     if (t.id === "btn-msg-guardar") { guardarTexto(false); return; }
     if (t.id === "btn-msg-restaurar") { guardarTexto(true); return; }
+    const bVcf = t.closest("[data-vcf]");
+    if (bVcf) { descargarContacto(bVcf.dataset.vcf); return; }
     const bPdf = t.closest("[data-pdf]");
     if (bPdf) { descargarPDF(bPdf.dataset.pdf, bPdf.dataset.id); return; }
     const bComp = t.closest("[data-compartir]");

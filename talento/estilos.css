@@ -573,7 +573,7 @@ body.compartida { background: var(--blue-soft); }
   .puesto b { padding: 1px 6px; font-size: .68rem; }
   .avatar b { right: -9px; bottom: -7px; min-width: 1.35rem; height: 1.35rem; font-size: .62rem; }
 }
-@media (max-width: 600px) { .fc-nav .btn[data-cerrar-ficha] span { display: inline; } }
+@media (max-width: 600px) { .fc-nav .btn[data-cerrar-ficha] span { display: inline; } .fc-nav .btn[data-cerrar-ficha] .solo-escritorio { display: none; } }
 .fc-hero .eyebrow { color: var(--green); }
 
 /* ─── RLR · Mensaje de WhatsApp ─── */
@@ -607,3 +607,12 @@ body.compartida { background: var(--blue-soft); }
 .pdf-pie { text-align: center; color: var(--muted); font-size: 12px; margin: 0; padding: 8px 0 20px; }
 .fc-nav [data-pdf] { margin-left: 8px; }
 @media (max-width: 600px) { .fc-nav [data-pdf] span { display: inline; } }
+/* RLR · barra de la ficha en una sola fila en celular */
+@media (max-width: 600px) {
+  .solo-escritorio { display: none; }
+  .fc-nav { gap: 6px; }
+  .fc-nav .btn { padding: 0 .7rem; }
+  .fc-nav [aria-label="Anterior"], .fc-nav [aria-label="Siguiente"] { min-width: 44px; padding: 0; }
+  .fc-nav .fc-pos { margin-left: auto; white-space: nowrap; font-size: .8rem; }
+  .fc-nav [data-pdf] { margin-left: 0; }
+}
