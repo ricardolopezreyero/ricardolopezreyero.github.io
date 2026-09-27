@@ -593,3 +593,17 @@ body.compartida { background: var(--blue-soft); }
   .mensaje-ops .chip { flex: none; }
   .mensaje-vista { font-size: .85rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 }
+
+/* ─── RLR · Hoja para PDF (se arma fuera de pantalla y se convierte) ─── */
+.pdf-hoja { background: var(--blue-soft); color: var(--ink); }
+.pdf-hoja .fc-nav, .pdf-hoja .decision, .pdf-hoja .btn-comparar, .pdf-hoja .cmp-acciones, .pdf-hoja .fila-decision,
+.pdf-hoja .compartir-caja, .pdf-hoja [data-pdf], .pdf-hoja .fc-contacto { display: none !important; }
+.pdf-hoja .fc-lado { position: static; }
+.pdf-hoja .fc-cuerpo { padding-bottom: 16px; }
+.pdf-hoja .cmp-envoltura { overflow: visible; padding-bottom: 16px; }
+.pdf-hoja .cmp-t { position: static; }
+.pdf-hoja .panel, .pdf-hoja .cmp-fila { break-inside: avoid; }
+.pdf-hoja .lt-envio > *:not(summary) { display: block; }
+.pdf-pie { text-align: center; color: var(--muted); font-size: 12px; margin: 0; padding: 8px 0 20px; }
+.fc-nav [data-pdf] { margin-left: 8px; }
+@media (max-width: 600px) { .fc-nav [data-pdf] span { display: inline; } }

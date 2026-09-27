@@ -66,7 +66,12 @@
       sitekey, action: "entrar", theme: "dark", language: "es",
       callback: (t) => { token = t; if (pin.length === 4) entrar(); },
       "expired-callback": () => { token = ""; },
-      "error-callback": () => { token = ""; aviso("Cloudflare no pudo verificar. Recarga la página."); },
+      "error-callback": (codigo) => {
+        token = "";
+        // 110200 = este dominio aún no está autorizado en Turnstile: se entra por el Worker para no dejar a nadie fuera
+        if (EN_PAGES && String(codigo).startsWith("1102")) { location.replace("https://talento.noisy-shape-4fc9.workers.dev/"); return true; }
+        aviso("Cloudflare no pudo verificar. Recarga la página.");
+      },
     });
   };
   fetch(API + "/api/config").then((r) => r.json()).then((c) => {

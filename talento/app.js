@@ -384,7 +384,7 @@
     const ult = (c) => { const e = c.envios_detalle || []; return e[c.destacado ?? -1] || e[e.length - 1] || c; };
     return `
     <div class="fc-hero"><div class="fc-hero-in">
-      <div class="fc-nav"><button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver a la lista</span></button><span class="fc-pos">${P().nombre}</span></div>
+      <div class="fc-nav"><button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver a la lista</span></button><span class="fc-pos">${P().nombre}</span><button class="btn btn-verde btn-chico" data-pdf="comparar">⬇ <span>PDF</span></button></div>
       <div class="eyebrow">Lado a lado</div>
       <h1 class="cmp-h1">Comparar ${cs.length} finalistas</h1>
       <p class="hero-sub">Lo más fuerte de cada una aparece marcado en verde. La de mayor puntaje lleva la corona.</p>
@@ -407,7 +407,7 @@
         ? fila("Experiencia real con niños", (c) => `«${esc(ult(c).exp_ninos || "—")}»`) + fila("Si la niña se frustra", (c) => `«${esc(ult(c).frustracion || "—")}»`)
         : fila("Por qué es la mejor", (c) => `«${esc(ult(c).porque || "—")}»`) + fila("Lo primero que limpia", (c) => `«${esc(ult(c).limpia || "—")}»`) + fila("Lo que cocina", (c) => esc(ult(c).comidas || "—"))}
       ${fila("Referida por", (c) => esc(c.referido || "—"))}
-      ${fila("Decisión de la casa", (c) => marcasHTML(c))}
+      ${fila("Decisión de la casa", (c) => marcasHTML(c), "fila-decision")}
     </div></div>`;
   }
 
@@ -465,6 +465,69 @@
         <a class="btn btn-navy btn-chico" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ICONO_WA}Mandar por WhatsApp</a>
         <small>Solo muestra esta ficha. Vence el ${fecha(d.expira)}.</small>`;
     } catch { aviso("No se pudo crear el enlace"); }
+  }
+  /* ─── RLR · descargar PDF de la ficha o del comparativo ─── */
+  const H2P = { src: "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js", sri: "sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" };
+  function cargarH2P() {
+    if (window.html2pdf) return Promise.resolve();
+    return new Promise((ok, mal) => {
+      const s = document.createElement("script");
+      s.src = H2P.src; s.integrity = H2P.sri; s.crossOrigin = "anonymous"; s.referrerPolicy = "no-referrer";
+      s.onload = ok; s.onerror = mal; document.head.appendChild(s);
+    });
+  }
+  // Nombre de archivo: título + fecha y hora hasta el minuto (sin caracteres que rompan en Mac o Windows)
+  function nombreArchivo(titulo) {
+    const d = new Date(), p = (n) => String(n).padStart(2, "0");
+    const limpio = titulo.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim();
+    return `${limpio} · ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}h${p(d.getMinutes())}.pdf`;
+  }
+  let haciendoPDF = false;
+  async function descargarPDF(tipo, id) {
+    if (haciendoPDF) return;
+    haciendoPDF = true;
+    aviso("Preparando el PDF…");
+    const hoja = document.createElement("div");
+    hoja.className = "pdf-hoja";
+    let titulo, horizontal = false;
+    if (tipo === "ficha") {
+      const c = st.porId[id];
+      hoja.innerHTML = fichaCompleta(c);
+      titulo = `Ficha · ${c.nombre} · ${PC(c).nombre}`;
+    } else {
+      const cs = (st.comparar[st.puesto] || []).map((x) => st.porId[x]).filter(Boolean);
+      hoja.innerHTML = vistaComparar();
+      titulo = `Comparativo · ${cs.map((c) => primer(c.nombre)).join(", ")} · ${P().nombre}`;
+      horizontal = cs.length > 2;
+    }
+    const ahora = new Date().toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
+    hoja.insertAdjacentHTML("beforeend", `<p class="pdf-pie">Talento · documento privado · generado por ${esc(st.yo.nombre)} el ${esc(ahora)}</p>`);
+    // La librería copia la hoja a su propio espacio; basta con armarla sin pegarla a la página
+    const anchoPx = 1180;
+    hoja.style.width = `${anchoPx}px`;
+    $$("details", hoja).forEach((d) => d.setAttribute("open", ""));
+    anchos(hoja);
+    // Página del ancho exacto del diseño (a 96 ppp), con proporción de hoja A4
+    const margen = 6;
+    const anchoMm = anchoPx * 25.4 / 96 + margen * 2;
+    const altoMm = horizontal ? anchoMm / 1.414 : anchoMm * 1.414;
+    try {
+      await cargarH2P();
+      await document.fonts.ready;
+      await window.html2pdf().set({
+        margin: [margen, margen, margen + 2, margen],
+        filename: nombreArchivo(titulo),
+        image: { type: "jpeg", quality: 0.94 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#F4F7FF", x: 0, y: 0, scrollX: 0, scrollY: 0, width: anchoPx, windowWidth: anchoPx },
+        jsPDF: { unit: "mm", format: [anchoMm, altoMm], orientation: horizontal ? "landscape" : "portrait" },
+        pagebreak: { mode: ["css", "legacy"], avoid: [".panel", ".cmp-fila", ".caja", ".pregunta", ".fc-marcador", ".cita"] },
+      }).from(hoja).save();
+      aviso("PDF descargado");
+    } catch {
+      aviso("No se pudo crear el PDF. Intenta de nuevo.");
+    } finally {
+      haciendoPDF = false;
+    }
   }
   let porContratar = null;
   function pedirContratar(id, x, y) {
@@ -543,6 +606,7 @@
         ${ant ? `<button class="btn btn-contorno-claro" data-abrir="${ant.id}" aria-label="Anterior">‹ <span>Anterior</span></button>` : ""}
         ${sig ? `<button class="btn btn-contorno-claro" data-abrir="${sig.id}" aria-label="Siguiente"><span>Siguiente</span> ›</button>` : ""}
         <span class="fc-pos">${c.lugar ? `Lugar ${c.lugar} de ${st.total}` : "Nueva"}</span>
+        <button class="btn btn-verde btn-chico" data-pdf="ficha" data-id="${c.id}">⬇ <span>PDF</span></button>
       </div>
       <div class="fc-top">
         <div>
@@ -807,6 +871,8 @@
     if (t.id === "btn-editar-mensaje") { editarMensaje(); return; }
     if (t.id === "btn-msg-guardar") { guardarTexto(false); return; }
     if (t.id === "btn-msg-restaurar") { guardarTexto(true); return; }
+    const bPdf = t.closest("[data-pdf]");
+    if (bPdf) { descargarPDF(bPdf.dataset.pdf, bPdf.dataset.id); return; }
     const bComp = t.closest("[data-compartir]");
     if (bComp) { compartirFicha(bComp.dataset.compartir); return; }
     if (t.dataset && t.dataset.copiar) {
