@@ -1,30 +1,124 @@
 <!doctype html>
-<!-- RLR · Talento · puerta de GitHub hacia el tablero privado · Ricardo López Reyero · rev 181218 -->
+<!-- RLR · Candidatas para la casa · tablero · Ricardo López Reyero · build eye -->
 <html lang="es-MX">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://talento.noisy-shape-4fc9.workers.dev; base-uri 'none'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="author" content="Ricardo López Reyero">
 <meta name="build" content="eye">
+<meta name="rev" content="181218">
 <meta name="theme-color" content="#001240">
-<meta http-equiv="refresh" content="0; url=https://talento.noisy-shape-4fc9.workers.dev/">
-<title>Talento</title>
+<title>Talento · Casa</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<style>
-  :root { --green: #56EF9F; --navy-deep: #001240; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--navy-deep); color: #fff;
-    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif; text-align: center; padding: 16px; }
-  a { color: var(--green); font-weight: 700; }
-  p { color: #9db9e6; }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700;1,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
 </head>
-<body>
+<body data-rev="181218">
+  <header class="barra">
+    <div class="barra-in">
+      <div class="barra-titulo">Talento<small id="saludo">Candidatas para la casa</small></div>
+      <div class="tam" role="group" aria-label="Tamaño del texto">
+        <button id="tam-menos" aria-label="Letra más chica">A−</button>
+        <button id="tam-mas" aria-label="Letra más grande">A+</button>
+      </div>
+      <button class="btn btn-contorno-claro ocultar-movil" id="btn-como">Cómo las ordené</button>
+      <button class="btn btn-contorno-claro oculto" id="btn-agregar">Agregar</button>
+      <button class="btn btn-contorno-claro oculto ocultar-movil" id="btn-bitacora">Entradas</button>
+      <button class="btn btn-contorno-claro" id="btn-salir">Salir</button>
+    </div>
+  </header>
+
+  <nav class="puestos" id="puestos" aria-label="Puesto"></nav>
+
+  <section class="hero">
+    <div class="hero-in">
+      <div class="eyebrow">Las tres mejores</div>
+      <h1 id="hero-titulo">Quién debería entrar a <em>la casa</em></h1>
+      <p class="hero-sub" id="hero-sub"></p>
+      <button class="ver-como-movil" id="btn-como-movil">¿Cómo las ordené?</button>
+      <div class="podio" id="podio"></div>
+    </div>
+  </section>
+
   <main>
-    <h1>Talento</h1>
-    <p>Abriendo el tablero privado…</p>
-    <p><a href="https://talento.noisy-shape-4fc9.workers.dev/">Entrar</a></p>
+    <section class="mensaje-bar" id="mensaje-bar" aria-label="Mensaje de WhatsApp"></section>
+    <div class="herramientas">
+      <input class="buscar" id="buscar" type="search" placeholder="Buscar por nombre, colonia o palabra…" autocomplete="off" enterkeyhint="search">
+      <div class="chips" id="chips-estado"></div>
+      <div class="resumen-filtro" id="resumen-filtro"></div>
+    </div>
+    <div id="pendientes"></div>
+    <div id="secciones"></div>
   </main>
-  <script>location.replace("https://talento.noisy-shape-4fc9.workers.dev/" + location.hash);</script>
+
+  <div id="bandeja" class="bandeja oculto" role="region" aria-label="Comparar"></div>
+  <div id="ficha" class="ficha-completa oculto" role="dialog" aria-modal="true" aria-labelledby="fc-nombre"></div>
+
+  <dialog id="dlg-como">
+    <div class="dlg">
+      <h2>Cómo las ordené</h2>
+      <div class="como" data-puesto="domestica">
+      <p>Leí las respuestas de cada una pensando en una casa con una niña de 4 años, donde la persona se queda de lunes a jueves. Lo que buscan es armonía, limpieza, alegría y seriedad. Cada candidata suma puntos así:</p>
+      <table>
+        <tr><th>Qué se mide</th><th class="derecha">Puntos</th></tr>
+        <tr><td><b>Seriedad y confianza.</b> Referencias con nombre o teléfono, ex patrones, constancia y cuidado al contestar.</td><td class="derecha">25</td></tr>
+        <tr><td><b>Experiencia en casas.</b> Sale directo de lo que contestó.</td><td class="derecha">20</td></tr>
+        <tr><td><b>Limpieza y criterio.</b> Qué limpia primero y si sabe explicar por qué.</td><td class="derecha">20</td></tr>
+        <tr><td><b>Armonía y alegría.</b> Trato con niños, calma, gusto por servir y respeto por el ritmo de la familia.</td><td class="derecha">20</td></tr>
+        <tr><td><b>Cocina.</b> Variedad y comida que le guste a una niña.</td><td class="derecha">10</td></tr>
+        <tr><td><b>Intensidad.</b> Volvió a llenar el formulario. Más puntos si regresó semanas después.</td><td class="derecha">+5</td></tr>
+        <tr><td><b>Riesgo.</b> Contradicciones, planes de irse, lejanía o dudas de ritmo.</td><td class="derecha">−</td></tr>
+      </table>
+      <p><b>Llamar primero</b> son 70 puntos o más. <b>Buena opción</b> de 55 a 69. <b>Con reservas</b> de 37 a 54. <b>No la recomendamos</b> abajo de 37, o si no acepta quedarse a dormir o el horario.</p>
+      </div>
+      <div class="como oculto" data-puesto="guia">
+      <p>Para la guía de las tardes busqué a quien mejor acompañe a una niña de 4 años: que sepa enseñar jugando, que mantenga la calma y que sea de total confianza dentro de la casa.</p>
+      <table>
+        <tr><th>Qué se mide</th><th class="derecha">Puntos</th></tr>
+        <tr><td><b>Experiencia y formación.</b> Docencia, SEP, Montessori, guardería, años reales con niños.</td><td class="derecha">25</td></tr>
+        <tr><td><b>Criterio pedagógico.</b> Cómo organiza la tarde y cómo entiende el desarrollo.</td><td class="derecha">20</td></tr>
+        <tr><td><b>Calma y manejo emocional.</b> Qué hace si la niña se frustra o llora, con ejemplos reales.</td><td class="derecha">20</td></tr>
+        <tr><td><b>Confianza y discreción.</b> Cómo se comporta dentro de un hogar.</td><td class="derecha">15</td></tr>
+        <tr><td><b>Seriedad.</b> CV, referencias con teléfono, cartas y cuidado al contestar.</td><td class="derecha">15</td></tr>
+        <tr><td><b>Riesgo.</b> Respuestas copiadas de un chat, muy poca edad u otros compromisos.</td><td class="derecha">−</td></tr>
+      </table>
+      <p>Los mismos cortes: <b>Llamar primero</b> desde 70 puntos, <b>Buena opción</b> de 55 a 69, <b>Con reservas</b> de 37 a 54.</p>
+      </div>
+      <p>Las que lleguen después las califica Claude con la misma rúbrica de su puesto, calibrada con estas primeras.</p>
+    </div>
+    <div class="dlg-pie"><button class="btn btn-navy" data-cerrar>Entendido</button></div>
+  </dialog>
+
+  <dialog id="dlg-bitacora">
+    <div class="dlg"><h2>Quién ha entrado</h2><div id="bitacora-lista"></div></div>
+    <div class="dlg-pie"><button class="btn btn-navy" data-cerrar>Cerrar</button></div>
+  </dialog>
+
+  <dialog id="dlg-mensaje">
+    <div class="dlg">
+      <h2 id="msg-titulo">Editar mensaje</h2>
+      <p>Escribe <b>{nombre}</b> donde quieras que aparezca el nombre de cada candidata. El cambio es para toda su casa.</p>
+      <textarea id="msg-texto" class="msg-texto" rows="6" maxlength="1000" aria-label="Texto del mensaje"></textarea>
+    </div>
+    <div class="dlg-pie"><button class="btn btn-fantasma" id="btn-msg-restaurar">Restaurar original</button><button class="btn btn-fantasma" data-cerrar>Cancelar</button><button class="btn btn-navy" id="btn-msg-guardar">Guardar</button></div>
+  </dialog>
+
+  <dialog id="dlg-contratar" class="dlg-contratar">
+    <div class="dlg">
+      <div class="eyebrow">Confirmar contratación</div>
+      <h2>¿Contratar a <span id="contratar-nombre"></span>?</h2>
+      <p>Quedará como contratada para <span id="contratar-puesto"></span>. Su ficha se pondrá en gris y su WhatsApp se apaga, para que se vea que ya no está disponible. Si cambian de opinión, pican «No contratar» y vuelve.</p>
+    </div>
+    <div class="dlg-pie"><button class="btn btn-fantasma" data-cerrar>Cancelar</button><button class="btn btn-navy" id="btn-si-contratar">Sí, contratar</button></div>
+  </dialog>
+
+  <input type="file" id="archivo" accept=".csv,text/csv" multiple class="oculto">
+  <div class="aviso" id="aviso" role="status" aria-live="polite"><i>✓</i><span></span></div>
+  <script src="app.js"></script>
 </body>
 </html>
