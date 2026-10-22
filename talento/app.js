@@ -595,13 +595,15 @@
   // Preguntas y respuestas de un envío, con las etiquetas del puesto
   function preguntasRespuestas(c, e) {
     const vistas = new Set(); const out = [];
+    const crudas = (e.respuestas || []).filter((r) => r.r);
+    const yaDicho = new Set(crudas.map((r) => String(r.r).trim()));
+    for (const r of crudas) out.push([r.p, r.r]);
     for (const p of PC(c).preguntas || []) {
       if (vistas.has(p.clave)) continue;
       const r = e[p.clave] ?? (p.clave in e ? "" : c[p.clave]);
-      if (r == null || r === "") continue;
+      if (r == null || r === "" || yaDicho.has(String(r).trim())) continue;
       vistas.add(p.clave); out.push([p.corta || p.etiqueta, r]);
     }
-    for (const r of e.respuestas || []) if (r.r) out.push([r.p, r.r]);
     out.push(["Referida por", e.referido || c.referido], ["Colonia", e.colonia || c.colonia]);
     return out;
   }
@@ -710,7 +712,9 @@
     const d = ultimoEnvio(c);
     const otraSol = c.destacado != null && c.destacado !== envios.length - 1;
     const top = c.lugar && c.lugar <= 3 ? `Es la ${LUGARES[c.lugar - 1]} opción de las ${st.total}.` : "";
-    const citas = (rub.citas || []).filter(([k]) => d[k]);
+    const crudasFicha = new Set((d.respuestas || []).map((r) => String(r.r || "").trim()));
+    const citas = (rub.citas || []).filter(([k]) => d[k] && !crudasFicha.has(String(d[k]).trim()));
+    for (const r of d.respuestas || []) if (r.r) citas.push([`__${r.p}`, r.p]);
     return `
     <div class="fc-hero"><div class="fc-hero-in">
       <div class="fc-nav">
@@ -761,7 +765,7 @@
         <section class="panel">
           <h2>En sus palabras</h2>
           <p class="sub">Lo que ella escribió${c.envios > 1 ? (otraSol ? ` en su solicitud del ${fecha(d.fecha)}, la que mejor la representa` : " en su solicitud más reciente") : " en su solicitud"}, tal cual.</p>
-          ${citas.map(([k, t]) => `<div class="cita-titulo">${esc(t)}</div><blockquote class="cita"><p>«${esc(d[k])}»</p></blockquote>`).join("")}
+          ${citas.map(([k, t]) => `<div class="cita-titulo">${esc(t)}</div><blockquote class="cita"><p>«${esc(k.startsWith("__") ? ((d.respuestas || []).find((r) => r.p === t) || {}).r : d[k])}»</p></blockquote>`).join("")}
           ${rub.platillos && d[rub.platillos] ? `<div class="cita-titulo">Lo que cocina muy bien</div>${platillos(d[rub.platillos])}` : ""}
           ${!citas.length && !(rub.platillos && d[rub.platillos]) ? qaLista(c, d) : ""}
           ${cvs(d.cv)}
