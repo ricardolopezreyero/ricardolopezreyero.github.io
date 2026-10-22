@@ -558,7 +558,7 @@ body.compartida { background: var(--blue-soft); }
 .embudo-paso .tasa { position: absolute; right: 10px; top: 10px; font-size: .68rem; font-weight: 700; color: var(--blue); background: var(--blue-softer); padding: 1px 7px; border-radius: 9999px; font-variant-numeric: tabular-nums; }
 .embudo-paso .barra { height: 5px; border-radius: 4px; background: var(--blue-softer); margin-top: 10px; overflow: hidden; }
 .embudo-paso .barra i { display: block; height: 100%; background: var(--blue); border-radius: 4px; }
-.kanban { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 8px; }
+.kanban { display: grid; grid-template-columns: repeat(5, minmax(196px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 8px; }
 .kcol { background: var(--blue-soft); border: .5px solid var(--border); border-radius: 12px; padding: 10px; min-height: 160px; }
 .kcol-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px 10px; }
 .kcol-cab h3 { font-size: .78rem; letter-spacing: 1px; text-transform: uppercase; color: var(--navy); font-weight: 800; }

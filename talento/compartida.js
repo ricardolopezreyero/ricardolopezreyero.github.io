@@ -15,7 +15,19 @@
   };
   const cita = (t, x) => `<div class="cita-titulo">${t}</div><blockquote class="cita"><p>«${esc(x || "—")}»</p></blockquote>`;
 
-  function pintar(c, expira) {
+  let PU = null; // lo que el servidor sabe del puesto (nombre, medidores, citas)
+  function citasDe(c, e) {
+    if (PU && PU.citas && PU.citas.length) {
+      let out = PU.citas.filter(([k]) => e[k]).map(([k, t]) => cita(t, e[k])).join("");
+      if (PU.platillos && e[PU.platillos]) out += cita("Lo que cocina muy bien", e[PU.platillos]);
+      if (!out && PU.preguntas) out = PU.preguntas.filter(([k]) => e[k]).map(([k, t]) => cita(t, e[k])).join("");
+      return out || cita("Su solicitud", e.porque || e.exp_ninos);
+    }
+    return c.puesto === "guia" ? cita("Una experiencia real con niños pequeños", e.exp_ninos) + cita("Si la niña se frustra o llora", e.frustracion) + cita("Cómo organizaría una tarde de 4 horas", e.tarde) + cita("Qué es ser confiable dentro de un hogar", e.confianza)
+      : cita("Por qué cree que es la mejor para el puesto", e.porque) + cita("Lo primero que limpia al llegar, y por qué", e.limpia) + cita("Lo que cocina muy bien", e.comidas);
+  }
+  function pintar(c, expira, puesto) {
+    PU = puesto || null;
     const guia = c.puesto === "guia";
     const e = (c.envios_detalle || [])[c.destacado ?? -1] || (c.envios_detalle || []).slice(-1)[0] || c;
     const msg = `Hola ${primer(c.nombre)}, buen día. Le escribo por la solicitud que llenó para trabajar en casa. ¿Sigue disponible?`;
@@ -27,14 +39,14 @@
       <div class="fc-nav"><span class="eyebrow">Talento · ficha compartida</span><span class="fc-pos">Vence el ${fecha(expira)}</span></div>
       <div class="fc-top">
         <div>
-          <div class="fc-lugar"><span class="veredicto v-${c.nivel}">${V[c.nivel] || ""}</span><span class="insignia fuerte">${guia ? "Guía" : "Empleado doméstico"}</span></div>
+          <div class="fc-lugar"><span class="veredicto v-${c.nivel}">${V[c.nivel] || ""}</span><span class="insignia fuerte">${esc(PU ? PU.nombre : guia ? "Guía" : "Empleado doméstico")}</span></div>
           <h1>${esc(c.nombre)}</h1>
           <div class="fc-meta">${c.edad ? `<span>${c.edad} años</span>` : ""}${c.colonia ? `<span>${esc(c.colonia)}</span>` : ""}${!guia && c.experiencia ? `<span>${esc(c.experiencia)} en casas</span>` : ""}</div>
           <div class="fc-contacto">${wa}</div>
         </div>
         <div class="fc-marcador">
           <div class="fc-marcador-cab"><span>Calificación</span><div class="puntaje-num tab">${c.puntos ?? "—"}<small>/100</small></div></div>
-          <div class="medidores">${(MED[c.puesto] || MED.domestica).map(([n, k, max]) => `<div class="medidor"><span class="m-nombre">${n}</span><span class="m-barra"><i data-w="${Math.round(((c[k] || 0) / max) * 100)}"></i></span><span class="m-num">${c[k] ?? 0}/${max}</span></div>`).join("")}</div>
+          <div class="medidores">${((PU && PU.medidores) || MED[c.puesto] || MED.domestica).map(([n, k, max]) => `<div class="medidor"><span class="m-nombre">${n}</span><span class="m-barra"><i data-w="${Math.round(((c[k] || 0) / max) * 100)}"></i></span><span class="m-num">${c[k] ?? 0}/${max}</span></div>`).join("")}</div>
         </div>
       </div>
     </div></div>
@@ -46,8 +58,7 @@
         ${c.preguntar ? `<div class="pregunta"><span></span><div><b>Pregunta para la primera llamada</b><p>${esc(c.preguntar)}</p></div></div>` : ""}
       </section>
       <section class="panel"><h2>En sus palabras</h2><p class="sub">Lo que ella escribió en su solicitud, tal cual.</p>
-        ${guia ? cita("Una experiencia real con niños pequeños", e.exp_ninos) + cita("Si la niña se frustra o llora", e.frustracion) + cita("Cómo organizaría una tarde de 4 horas", e.tarde) + cita("Qué es ser confiable dentro de un hogar", e.confianza)
-               : cita("Por qué cree que es la mejor para el puesto", e.porque) + cita("Lo primero que limpia al llegar, y por qué", e.limpia) + cita("Lo que cocina muy bien", e.comidas)}
+        ${citasDe(c, e)}
       </section>
       <p class="pie-compartida">Este enlace muestra solo esta ficha y vence el ${fecha(expira)}.</p>
     </div></div>`;
@@ -59,7 +70,7 @@
   const token = location.hash.replace(/^#/, "") || location.pathname.split("/").pop();
   fetch(`${API}/api/compartida/${encodeURIComponent(token)}`).then((r) => r.json().then((d) => [r.ok, d])).then(([ok, d]) => {
     if (!ok) throw new Error("vencido");
-    pintar(d.candidata, d.expira);
+    pintar(d.candidata, d.expira, d.puesto);
   }).catch(() => {
     $("#ficha").innerHTML = `<div class="fc-hero"><div class="fc-hero-in"><div class="eyebrow">Talento</div><h1 class="cmp-h1">Este enlace ya no está disponible</h1><p class="hero-sub">Pídele a quien te lo mandó que te comparta uno nuevo.</p></div></div>`;
   });
