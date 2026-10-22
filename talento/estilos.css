@@ -666,3 +666,11 @@ body.compartida { background: var(--blue-soft); }
 .etq-caja p { font-size: .95rem; line-height: 1.6; }
 .etq-caja.etq-lista { background: #eef3ff; } .etq-caja.etq-lista b { color: var(--blue); }
 .etq-caja.etq-empatica { background: #fff3f5; } .etq-caja.etq-empatica b { color: #b01c3c; }
+.criterio-etq { margin-bottom: 14px; }
+.dimensiones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.dim { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; border: .5px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.dim-n { font-size: 1.6rem; font-weight: 800; color: var(--navy); line-height: 1; letter-spacing: -1px; }
+.dim-n small { font-size: .7rem; color: var(--dim); font-weight: 600; letter-spacing: 0; }
+.dim b { display: block; font-size: .7rem; letter-spacing: 1.1px; text-transform: uppercase; color: var(--blue); margin-bottom: 2px; }
+.dim p { font-size: .88rem; line-height: 1.55; color: var(--ink); }
+@media (max-width: 600px) { .dimensiones { grid-template-columns: 1fr; } }

@@ -236,7 +236,7 @@
     return `<article class="puesto-card ${p.activo === 0 ? "inactivo" : ""}">
       <h3>${esc(p.nombre)} <span class="insignia">${esc(p.prefijo || "")}</span>${p.activo === 0 ? `<span class="insignia aviso">Pausado</span>` : ""}${p.enCodigo ? "" : `<span class="insignia">Creado en el tablero</span>`}</h3>
       <p class="pc-desc">${esc(p.descripcion || "")}</p>
-      ${(st.etiquetas || []).some((e) => e.puesto === p.id) ? `<div class="insignias">${(st.etiquetas || []).filter((e) => e.puesto === p.id).map((e) => { const c = st.porId[e.id]; return c ? `<span class="etq etq-${e.etiqueta} chica" title="${esc(e.motivo || "")}">${e.etiqueta === "lista" ? "🧠" : "💛"} ${esc(T.primer(c.nombre))}</span>` : ""; }).join("")}</div>` : (l.length >= 100 ? "" : `<small class="quien">Las etiquetas «más lista» y «más empática» aparecen a partir de 100 candidatas.</small>`)}
+      ${(st.etiquetas || []).some((e) => e.puesto === p.id) ? `<div class="insignias">${(st.etiquetas || []).filter((e) => e.puesto === p.id).map((e) => { const c = st.porId[e.id]; return c ? `<span class="etq etq-${e.etiqueta} chica" title="${esc(e.motivo || "")}">${e.etiqueta === "lista" ? "🧠" : "💛"} ${e.orden || 1} · ${esc(T.primer(c.nombre))}</span>` : ""; }).join("")}</div>` : (l.length >= 100 ? "" : `<small class="quien">Las etiquetas «más lista» y «más empática» aparecen a partir de 100 candidatas.</small>`)}
       <div class="pc-cifras"><span><b>${l.length}</b>candidatas</span><span><b>${a}</b>para llamar</span><span><b>${proceso}</b>en proceso</span><span><b>${contr}</b>contratadas</span></div>
       <div class="pc-forms">${(p.formularios || []).map((f) => `<a href="https://link.superleads.mx/widget/form/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.nombre || f.id)} ↗</a>`).join("") || `<span class="quien">Sin formulario ligado</span>`}</div>
       <div class="pc-acciones"><button class="btn btn-navy btn-chico" data-ver-puesto="${p.id}">Ver candidatas</button>${st.yo.admin ? `<button class="btn btn-contorno btn-chico" data-editar-puesto="${p.id}">Editar</button><button class="btn btn-fantasma btn-chico" data-sync-puesto="${p.id}">↻ Traer</button>` : ""}</div>
@@ -336,6 +336,13 @@
   function como(v) {
     v.innerHTML = `
       <section class="cab"><div><div class="eyebrow">La casa</div><h1>Cómo las ordené</h1><p class="sub">Cada puesto tiene su rúbrica. Las primeras las revisé una por una; las que llegan después las califica Claude con la misma rúbrica, calibrada con esas.</p></div></section>
+      <section class="grafica criterio-etq"><h3>Más lista y más empática</h3><p class="g-sub">Aparte del puntaje, a TODAS las candidatas se les califica con el mismo criterio dos cosas de 0 a 10, leyendo solo lo que escribieron. Las dos con mayor listeza y las dos con mayor empatía de cada puesto llevan la etiqueta 1 y 2 (empate: mayor puntaje general, luego la que llegó antes). Solo en puestos con 100 candidatas o más; cuando llega una nueva, se califica y, si supera, toma el lugar.</p>
+        <table class="tabla-como"><tr><th>Listeza (inteligencia práctica)</th><th>Empatía (calidez real)</th></tr>
+          <tr><td><b>0 a 3.</b> No entiende lo que se le pregunta o contesta con una palabra.</td><td><b>0 a 3.</b> Solo habla de tareas o de sí misma; no aparece nadie más.</td></tr>
+          <tr><td><b>4 a 6.</b> Contesta lo que se pide, con algún detalle, sin explicar el porqué.</td><td><b>4 a 6.</b> Menciona a la familia o a la niña, con amabilidad general.</td></tr>
+          <tr><td><b>7 a 8.</b> Criterio y orden; explica el porqué; detalles concretos y útiles.</td><td><b>7 a 8.</b> Se pone en el lugar del otro: escuchar, paciencia, respetar el ritmo de la casa.</td></tr>
+          <tr><td><b>9 a 10.</b> Además anticipa problemas y propone cómo resolverlos.</td><td><b>9 a 10.</b> Además cuenta con detalle una situación real de cuidado y lo que sintió el otro.</td></tr>
+        </table></section>
       <div class="lista">${st.puestos.filter((p) => p.activo !== 0).map((p) => `<section class="grafica">
         <h3>${esc(p.nombre)}</h3><p class="g-sub">${esc(p.descripcion || "")}</p>
         <table class="tabla-como"><tr><th>Qué se mide</th><th class="derecha">Puntos</th></tr>

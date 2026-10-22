@@ -125,7 +125,7 @@
   const ETQ = { lista: ["Más lista", "🧠"], empatica: ["Más empática", "💛"] };
   const etiquetasDe = (c) => (st.etiquetas || []).filter((e) => e.id === c.id && e.puesto === c.puesto);
   function etiquetasHTML(c, chicas = false) {
-    return etiquetasDe(c).map((e) => `<span class="etq etq-${e.etiqueta} ${chicas ? "chica" : ""}" title="${esc(e.motivo || "")}">${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]}</span>`).join("");
+    return etiquetasDe(c).map((e) => `<span class="etq etq-${e.etiqueta} ${chicas ? "chica" : ""}" title="${esc(e.motivo || "")}">${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} ${e.orden || 1}</span>`).join("");
   }
   const marcaDe = (c) => st.marcas[c.id] || {};
   const etapaDe = (c) => marcaDe(c).estado || "";
@@ -770,7 +770,8 @@
             <div class="caja caja-ojo"><h3>Lo que hay que confirmar</h3><p>${esc(c.a_cuidar || "—")}</p></div>
           </div>
           ${c.preguntar ? `<div class="pregunta">${ICONO_PREG}<div><b>Pregunta para la primera llamada</b><p>${esc(c.preguntar)}</p></div></div>` : ""}
-          ${etiquetasDe(c).map((e) => `<div class="etq-caja etq-${e.etiqueta}"><b>${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} de ${esc(p.nombre.toLowerCase())}</b><p>${esc(e.motivo || "")}</p></div>`).join("")}
+          ${etiquetasDe(c).map((e) => `<div class="etq-caja etq-${e.etiqueta}"><b>${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} ${e.orden || 1} de ${esc(p.nombre.toLowerCase())}</b><p>${esc(e.motivo || "")}</p></div>`).join("")}
+          ${c.p_lista != null && c.p_lista >= 0 ? `<div class="dimensiones"><div class="dim"><span class="dim-n tab">${c.p_lista}<small>/10</small></span><div><b>Listeza</b><p>${esc(c.lista_motivo || "")}</p></div></div><div class="dim"><span class="dim-n tab">${c.p_empatia}<small>/10</small></span><div><b>Empatía</b><p>${esc(c.empatia_motivo || "")}</p></div></div></div>` : ""}
         </section>
 
         <section class="panel">
