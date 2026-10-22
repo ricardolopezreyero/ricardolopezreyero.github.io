@@ -823,7 +823,7 @@
           <h2>Decisión de la casa</h2>
           <p class="sub">Lo que marquen aquí lo ve toda su casa.</p>
           ${marcasHTML(c)}
-          ${noDisponible(c) ? "" : `<div class="sondeo-caja"><b>¿Está abierta a un nuevo trabajo?</b><p>Un clic y le llega un correo suave con dos botones; no se dice quién es la familia. Si no contesta, se repite tres veces, siempre en horario laboral (lunes a sábado de 9 a 19), la última también por SMS cuando haya proveedor.</p>${sondeoHTML(c, true)}${st.yo.admin ? `<button type="button" class="btn btn-fantasma btn-chico" data-sondeo-prueba="${c.id}">Probar conmigo</button>` : ""}</div>`}
+          ${noDisponible(c) ? "" : `<div class="sondeo-caja"><b>¿Está abierta a un nuevo trabajo?</b><p>Un clic y le llega un correo suave con dos botones; no se dice quién es la familia. Si no contesta, se repite tres veces, siempre en horario laboral (lunes a sábado de 9 a 19), la última también por SMS cuando haya proveedor.</p>${sondeoHTML(c, true)}</div>`}
           <div class="nota"><label for="nota-${c.id}">Notas de la llamada</label>
             <textarea id="nota-${c.id}" data-nota="${c.id}" placeholder="Ej. Contestó rápido, puede empezar el lunes…">${esc(m.nota || "")}</textarea>
             <small id="nota-estado-${c.id}">${m.nota && m.cuando ? `Guardado ${fecha(m.cuando)}` : "Se guarda solo"}</small></div>
@@ -1026,6 +1026,74 @@
     sincronizando = false;
   }
 
+  /* ─── RLR · sondeo: ver el correo y el SMS antes de mandarlos, editarlos y mandar ─── */
+  let sondeoActual = null;
+  const horaLocal = (iso) => { const d = new Date(iso), hoy = new Date(), man = new Date(hoy); man.setDate(hoy.getDate() + 1);
+    const dia = d.toDateString() === hoy.toDateString() ? "hoy" : d.toDateString() === man.toDateString() ? "mañana" : d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "short" });
+    return `${dia} ${d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}`; };
+  async function abrirSondeo(id) {
+    const c = st.porId[id]; if (!c) return;
+    const dlg = $("#dlg-sondeo");
+    dlg.classList.remove("encoger");
+    dlg.innerHTML = `<div class="dlg"><p class="sub">Preparando la vista previa…</p></div>`;
+    dlg.showModal();
+    let v;
+    try { v = await api(`/api/sondeo/vista?id=${encodeURIComponent(id)}`); } catch { dlg.close(); aviso("No se pudo preparar el sondeo"); return; }
+    sondeoActual = { id, v };
+    dlg.innerHTML = `
+      <div class="dlg sondeo-modal">
+        <div class="eyebrow">Sondeo de disponibilidad</div>
+        <h2 id="sondeo-titulo">¿${esc(v.primer)} está abierta a un nuevo trabajo?</h2>
+        <p class="sub">Esto es exactamente lo que le va a llegar. Puedes afinar el texto antes de mandarlo. ${v.correoValido ? `Correo: <b>${esc(v.correo)}</b>.` : `<b>No dejó un correo válido</b>, así que por ahora no se puede mandar.`}</p>
+        <div class="sondeo-cols">
+          <section class="sondeo-correo">
+            <h3>Correo 1 · sale ahora</h3>
+            <label class="campo"><span>Asunto</span><input id="son-asunto" maxlength="140" value="${esc(v.textos.asunto)}"></label>
+            <div class="correo-vista" id="correo-vista">
+              <div class="cv-marca">Reclutamiento Talento · Torreón</div>
+              <div class="cv-hola">Hola, ${esc(v.primer)} 👋</div>
+              <textarea id="son-intro" class="cv-intro" rows="3" maxlength="1200" aria-label="Texto del correo">${esc(v.textos.intro)}</textarea>
+              <div class="cv-pregunta">${esc(v.pregunta)}</div>
+              <div class="cv-botones"><span class="btn btn-verde">Sí, estoy abierta</span><span class="btn btn-contorno">Por ahora no</span></div>
+              <div class="cv-cierre">${esc(v.cierre)}</div>
+              <div class="cv-pie">${esc(v.pie)}</div>
+            </div>
+          </section>
+          <section class="sondeo-lado">
+            <h3>SMS · va con el aviso 4</h3>
+            <textarea id="son-sms" class="entrada-texto" rows="4" maxlength="320" aria-label="Texto del SMS">${esc(v.textos.sms)}</textarea>
+            <small class="quien">Las ligas {liga_si} y {liga_no} se llenan solas. ${v.sms_disponible ? "" : "Todavía no hay proveedor de SMS: se anota y se manda cuando lo haya."}</small>
+            <h3>Si no contesta</h3>
+            <ol class="sondeo-plan">${v.plan.map((p) => `<li><b>${p.paso === 1 ? "Correo 1" : `Aviso ${p.paso}`}</b> · ${p.paso === 1 ? "ahora" : horaLocal(p.cuando)}${p.paso > 1 ? `<br><span class="quien">«${esc(v.avisos[p.paso] || "")}»${p.canales.includes("sms") ? " · correo y SMS" : ""}</span>` : ""}</li>`).join("")}</ol>
+            <small class="quien">Siempre en horario laboral, lunes a sábado de 9 a 19. En cuanto conteste cualquiera, se detiene todo.</small>
+          </section>
+        </div>
+      </div>
+      <div class="dlg-pie">${st.yo.admin ? `<button class="btn btn-fantasma" id="btn-sondeo-prueba">Mandarme una prueba</button>` : ""}<button class="btn btn-fantasma" data-cerrar>Cancelar</button><button class="btn btn-verde" id="btn-sondeo-enviar" ${v.correoValido ? "" : "disabled"}>${ICONO_PREG}Enviar a ${esc(v.primer)}</button></div>`;
+  }
+  function textosDelModal() {
+    return { asunto: $("#son-asunto").value.trim(), intro: $("#son-intro").value.trim(), sms: $("#son-sms").value.trim() };
+  }
+  async function enviarSondeo(prueba) {
+    if (!sondeoActual) return;
+    const { id, v } = sondeoActual;
+    const dlg = $("#dlg-sondeo");
+    let correo = "";
+    if (prueba) { correo = prompt("¿A qué correo mando la prueba?", "ricardo@superleads.mx"); if (!correo) return; }
+    $$("button", dlg).forEach((b) => { b.disabled = true; });
+    try {
+      const r = await api("/api/sondeo", { id, prueba, correo, textos: textosDelModal() });
+      // El modal se encoge hacia la notificación de abajo y ahí se queda el aviso
+      dlg.classList.add("encoger");
+      setTimeout(() => { dlg.close(); dlg.classList.remove("encoger"); }, 520);
+      aviso(prueba ? `Prueba enviada a ${correo}` : `✉ Correo enviado a ${v.primer}. Si no contesta, aviso 2 ${r.siguiente ? horaLocal(r.siguiente) : "en horario laboral"}.`, 7000);
+      if (!prueba) { sondeoActual = null; await cargar(); } else $$("button", dlg).forEach((b) => { b.disabled = false; });
+    } catch (e) {
+      $$("button", dlg).forEach((b) => { b.disabled = false; });
+      aviso((e.datos && e.datos.mensaje) || "No se pudo mandar", 6000);
+    }
+  }
+
   /* ─── tamaño de letra ─── */
   function escala(delta) {
     let e = 1; try { e = Number(localStorage.getItem("casa-escala")) || 1; } catch {}
@@ -1072,23 +1140,11 @@
     if (bNo) { ev.stopPropagation(); liberar(bNo.closest(".marcas").dataset.id); return; }
     if (t.id === "btn-si-contratar") { contratar(); return; }
     const bSon = t.closest("[data-sondeo]");
-    if (bSon) {
-      ev.stopPropagation();
-      const id = bSon.dataset.sondeo; const c = st.porId[id];
-      bSon.disabled = true; aviso(`Mandando el correo a ${primer(c.nombre)}…`, 8000);
-      api("/api/sondeo", { id }).then(async () => { aviso(`Listo: ${primer(c.nombre)} ya tiene el correo. Si no contesta, se repite solo.`, 6000); await cargar(); })
-        .catch((e) => { bSon.disabled = false; aviso((e.datos && e.datos.mensaje) || "No se pudo mandar el correo", 6000); });
-      return;
-    }
+    if (bSon) { ev.stopPropagation(); abrirSondeo(bSon.dataset.sondeo); return; }
     const bSonP = t.closest("[data-sondeo-prueba]");
-    if (bSonP) {
-      ev.stopPropagation();
-      const correo = prompt("¿A qué correo mando la prueba? Llega tal cual lo vería la candidata, con los dos botones.", "ricardo@superleads.mx");
-      if (!correo) return;
-      aviso("Mandando la prueba…", 8000);
-      api("/api/sondeo", { id: bSonP.dataset.sondeoPrueba, prueba: true, correo }).then(() => aviso(`Prueba enviada a ${correo}`, 6000)).catch((e) => aviso((e.datos && e.datos.mensaje) || "No se pudo mandar la prueba", 6000));
-      return;
-    }
+    if (bSonP) { ev.stopPropagation(); abrirSondeo(bSonP.dataset.sondeoPrueba); return; }
+    if (t.id === "btn-sondeo-enviar") { enviarSondeo(false); return; }
+    if (t.id === "btn-sondeo-prueba") { enviarSondeo(true); return; }
     const bFav = t.closest("[data-favorita]");
     if (bFav) {
       ev.stopPropagation();
