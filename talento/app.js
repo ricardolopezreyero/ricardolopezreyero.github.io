@@ -1,6 +1,8 @@
 /* ─────────────────────────────────────────────────────────────
- *  RLR · Candidatas para la casa · tablero
+ *  RLR · Talento · reclutamiento de la casa · núcleo del tablero
  *  Autor: Ricardo López Reyero · build eye · rev 181218
+ *  Candidatas, ficha completa, comparar, marcas, importar y contacto.
+ *  Las pantallas de embudo, analítica y puestos viven en pantallas.js.
  * ───────────────────────────────────────────────────────────── */
 (() => {
   const _RLR = "Ricardo López Reyero";
@@ -9,7 +11,6 @@
   // RLR · la pantalla puede vivir en GitHub Pages o en el Worker; la API siempre está en el Worker
   const EN_PAGES = location.hostname.endsWith("github.io");
   const API = EN_PAGES ? "https://talento.noisy-shape-4fc9.workers.dev" : "";
-  const INICIO = EN_PAGES ? "./" : "/";
   const ENTRADA = EN_PAGES ? "entrar.html" : "/";
   const leerLlave = () => { try { return localStorage.getItem("talento-llave") || ""; } catch { return ""; } };
   const ponerLlave = (v) => { try { v ? localStorage.setItem("talento-llave", v) : localStorage.removeItem("talento-llave"); } catch { /* sin almacenamiento */ } };
@@ -18,55 +19,53 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  const st = { comparar: { domestica: [], guia: [] }, nombres: {}, ocupadas: new Set(), yo: null, todas: [], lista: [], porId: {}, marcas: {}, q: "", filtro: "todas", verD: false, total: 0, puesto: "domestica" };
+  const st = {
+    puestos: [], porPuesto: {}, puesto: "domestica", comparar: {}, nombres: {}, ocupadas: new Set(), yo: null,
+    todas: [], lista: [], porId: {}, marcas: {}, eventos: [], sincronizaciones: [], crm: null,
+    q: "", filtro: "todas", vista: "tarjetas", verD: false, total: 0, pantalla: "tablero",
+  };
 
   /* ─── utilidades ─── */
   const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   function fecha(iso) {
     if (!iso) return "—";
-    if (/Z$|[+-]\d{2}:\d{2}$/.test(iso)) {
-      const t = new Date(iso);
-      return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`;
-    }
+    if (/Z$|[+-]\d{2}:\d{2}$/.test(iso)) { const t = new Date(iso); return `${t.getDate()} ${MESES[t.getMonth()]} ${t.getFullYear()}`; }
     const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
     return `${d} ${MESES[m - 1]} ${y}`;
   }
+  const dias = (iso) => (iso ? Math.floor((Date.now() - new Date(iso.slice(0, 19))) / 86400000) : null);
   function hace(iso) {
     if (!iso) return "";
-    const dias = Math.floor((Date.now() - new Date(iso.slice(0, 19))) / 86400000);
-    if (dias < 1) return "hoy";
-    if (dias < 14) return `hace ${dias} días`;
-    if (dias < 60) return `hace ${Math.round(dias / 7)} semanas`;
-    return `hace ${Math.round(dias / 30)} meses`;
+    const d = dias(iso);
+    if (d < 1) return "hoy";
+    if (d < 14) return `hace ${d} días`;
+    if (d < 60) return `hace ${Math.round(d / 7)} semanas`;
+    return `hace ${Math.round(d / 30)} meses`;
   }
-  const reciente = (c) => c.ultimo_envio && (Date.now() - new Date(c.ultimo_envio.slice(0, 19))) / 86400000 <= 60;
+  const reciente = (c) => c.ultimo_envio && dias(c.ultimo_envio) <= 60;
   const tel = (t) => (t && t.length === 10 ? `${t.slice(0, 3)} ${t.slice(3, 6)} ${t.slice(6)}` : t || "—");
   const primer = (n) => String(n || "").split(" ").find((w) => w.length > 2 && !/^ma\.?$/i.test(w)) || n;
   const iniciales = (n) => String(n || "").split(" ").filter((w) => w.length > 2 && !/\.$/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  /* RLR · mensajes de WhatsApp: tres opciones por puesto, editables para toda la casa */
-  const MENSAJES = {
-    domestica: [
-      ["entre", "Entre semana", "Hola {nombre}, buen día. Le escribo por la solicitud que llenó para trabajar en casa de planta entre semana: entrada el lunes de 8 a 9 de la mañana, salida el viernes de 5 a 7 de la tarde, y se queda a dormir de lunes a jueves. ¿Sigue disponible? Me gustaría platicar con usted."],
-      ["finde", "Fin de semana", "Hola {nombre}, buen día. Le escribo por la solicitud que llenó para trabajar en casa. Estamos buscando apoyo para los fines de semana. ¿Tendría disponibilidad el sábado y el domingo? Me gustaría platicar con usted."],
-      ["generico", "Genérico", "Hola {nombre}, buen día. Le escribo por la solicitud que llenó para trabajar en casa. ¿Sigue disponible? Me gustaría platicar con usted."],
-    ],
-    guia: [
-      ["entre", "Tardes entre semana", "Hola {nombre}, buen día. Le escribo por su solicitud como guía para nuestra hija de 4 años. Buscamos a alguien que la acompañe por las tardes entre semana, unas 4 horas al día. ¿Sigue disponible? Me gustaría agendar una entrevista."],
-      ["finde", "Fin de semana", "Hola {nombre}, buen día. Le escribo por su solicitud como guía para nuestra hija de 4 años. Buscamos a alguien que la acompañe los fines de semana. ¿Tendría disponibilidad el sábado o el domingo? Me gustaría agendar una entrevista."],
-      ["generico", "Genérico", "Hola {nombre}, buen día. Le escribo por su solicitud como guía para nuestra hija de 4 años. ¿Sigue disponible? Me gustaría platicar con usted."],
-    ],
-  };
   const guardado = (k, def) => { try { return localStorage.getItem(k) || def; } catch { return def; } };
   const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
+
+  /* ─── puestos (vienen del servidor) ─── */
+  const P = () => st.porPuesto[st.puesto] || st.puestos[0] || { id: "domestica", nombre: "Empleado doméstico", corto: "Planta", preguntas: [], rubrica: { medidores: [] }, mensajes: [] };
+  const PC = (c) => st.porPuesto[c.puesto] || P();
+  const TITULOS = { domestica: "Quién debería entrar a <em>la casa</em>", guia: "Quién debería ser <em>la guía</em>", finde: "Quién debería cuidar <em>el fin de semana</em>", masajista: "Quién debería dar <em>los masajes</em>" };
+  const tituloDe = (p) => TITULOS[p.id] || `Quién debería ser <em>${esc(String(p.nombre).toLowerCase())}</em>`;
+  const medidoresDe = (p) => (p.rubrica && p.rubrica.medidores) || [];
+
+  /* RLR · mensajes de WhatsApp: tres opciones por puesto, editables para toda la casa */
   function opcionMensaje(puesto) {
-    const ops = MENSAJES[puesto] || MENSAJES.domestica;
-    const k = guardado(`talento-mensaje-${puesto}`, ops[0][0]);
-    return ops.find((o) => o[0] === k) || ops[0];
+    const ops = (st.porPuesto[puesto] || P()).mensajes || [];
+    const k = guardado(`talento-mensaje-${puesto}`, ops[0] ? ops[0][0] : "generico");
+    return ops.find((o) => o[0] === k) || ops[0] || ["generico", "Genérico", "Hola {nombre}, buen día. Le escribo por su solicitud. ¿Sigue disponible?"];
   }
   function textoMensaje(puesto, clave) {
     const propio = (st.mensajes || []).find((m) => m.puesto === puesto && m.clave === clave);
     if (propio) return propio.texto;
-    const o = (MENSAJES[puesto] || MENSAJES.domestica).find((x) => x[0] === clave);
+    const o = ((st.porPuesto[puesto] || P()).mensajes || []).find((x) => x[0] === clave);
     return o ? o[2] : "";
   }
   function wa(c, t = c.celular) {
@@ -87,38 +86,25 @@
   };
   function veredicto(c) {
     const v = { ...VEREDICTO[c.nivel || "P"] };
-    if (c.nivel === "D" && c.descartada) { v.largo = "No acepta quedarse de planta"; v.frase = "No cumple el arreglo de quedarse a dormir."; }
+    if (c.nivel === "D" && c.descartada) { v.largo = "No acepta el arreglo"; v.frase = "No cumple el arreglo del puesto."; }
     if (c.evaluo === "pendiente" && c.nivel !== "P") v.corto += " · volvió a llenar";
     return v;
   }
   const LUGARES = ["primera", "segunda", "tercera"];
 
-  // RLR · puestos: cada uno con su rúbrica y sus textos
-  const PUESTOS = {
-    domestica: {
-      nombre: "Empleado doméstico",
-      titulo: "Quién debería entrar a <em>la casa</em>",
-      sub: (n, extra) => `${n} candidatas ordenadas de mejor a peor para una casa con armonía, limpieza, alegría y seriedad. Estas tres son las que yo llamaría primero. Otras ${extra} también valen la llamada.`,
-      medidores: [["Seriedad", "p_seriedad", 25], ["Experiencia", "p_exp", 20], ["Limpieza", "p_limpieza", 20], ["Armonía", "p_armonia", 20], ["Cocina", "p_cocina", 10]],
-    },
-    guia: {
-      nombre: "Guía",
-      titulo: "Quién debería ser <em>la guía</em>",
-      sub: (n, extra) => `${n} candidatas a guía para las tardes de la niña, ordenadas de mejor a peor por experiencia, criterio pedagógico, calma y confianza. Estas tres son las que yo entrevistaría primero. Otras ${extra} también valen la llamada.`,
-      medidores: [["Experiencia", "p_exp", 25], ["Pedagogía", "p_limpieza", 20], ["Calma", "p_armonia", 20], ["Confianza", "p_cocina", 15], ["Seriedad", "p_seriedad", 15]],
-    },
-  };
-  const P = () => PUESTOS[st.puesto] || PUESTOS.domestica;
-  const PC = (c) => PUESTOS[c.puesto] || PUESTOS.domestica;
+  // RLR · etapas del embudo, iguales para todo puesto. «Me gusta» es una marca aparte.
+  const ETAPAS = [["", "Nuevas"], ["contactada", "Contactadas"], ["entrevista", "Entrevista"], ["prueba", "Prueba"], ["contratada", "Contratadas"]];
+  const ETAPA_NOMBRE = { "": "Nueva", contactada: "Contactada", entrevista: "Entrevista", prueba: "Prueba", contratada: "Contratada", descartada: "Descartada" };
+  const ESTADOS = [["contactada", "Contactada"], ["entrevista", "Entrevista"], ["prueba", "Prueba"], ["contratada", "Contratada"], ["descartada", "Descartar"]];
 
   function medidores(c) {
-    if (c.puntos == null) return `<div class="m-nombre">Sin calificación todavía</div>`;
-    const m = PC(c).medidores.map(([n, k, max]) => [n, c[k], max]);
+    if (c.puntos == null) return `<div class="m-nombre sin">Sin calificación todavía</div>`;
+    const m = medidoresDe(PC(c)).map(([n, k, max]) => [n, c[k], max]);
     const aj = [];
     if (c.p_intensidad) aj.push(`<span class="insignia">+${c.p_intensidad} volvió a llenar</span>`);
     if (c.p_riesgo) aj.push(`<span class="insignia">−${c.p_riesgo} por riesgo</span>`);
     return `<div class="medidores">${m.map(([n, v, max]) => `
-      <div class="medidor" title="${n}: ${v ?? 0} de ${max}"><span class="m-nombre">${n}</span>
+      <div class="medidor" title="${esc(n)}: ${v ?? 0} de ${max}"><span class="m-nombre">${esc(n)}</span>
       <span class="m-barra"><i data-w="${Math.round(((v || 0) / max) * 100)}"></i></span>
       <span class="m-num">${v ?? 0}/${max}</span></div>`).join("")}
       ${aj.length ? `<div class="ajustes">${aj.join("")}</div>` : ""}</div>`;
@@ -126,21 +112,20 @@
 
   function insignias(c) {
     const out = [];
-    out.push(`<span class="insignia fuerte">${PC(c).nombre}</span>`);
+    out.push(`<span class="insignia fuerte">${esc(PC(c).corto || PC(c).nombre)}</span>`);
     if (c.edad) out.push(`<span class="insignia">${c.edad} años</span>`);
-    if (c.experiencia) out.push(`<span class="insignia">${esc(c.experiencia)} en casas</span>`);
+    if (c.experiencia && c.experiencia.length < 30) out.push(`<span class="insignia">${esc(c.experiencia)}${/año/.test(c.experiencia) ? "" : " de experiencia"}</span>`);
     if (c.envios > 1) out.push(`<span class="insignia fuerte">Llenó ${c.envios} veces</span>`);
     if (reciente(c)) out.push(`<span class="insignia">Reciente</span>`);
     return out.join("");
   }
 
-  const ESTADOS = [["favorita", "★ Me gusta"], ["contactada", "Contactada"], ["entrevista", "Entrevista"], ["contratada", "Contratada"], ["descartada", "Descartar"]];
-  const esContratada = (c) => (st.marcas[c.id] || {}).estado === "contratada";
-  // Contratada por otra familia: se ve en gris y no se puede marcar
+  const marcaDe = (c) => st.marcas[c.id] || {};
+  const etapaDe = (c) => marcaDe(c).estado || "";
+  const esContratada = (c) => etapaDe(c) === "contratada";
   const esOcupada = (c) => !esContratada(c) && st.ocupadas && st.ocupadas.has(c.id);
   const noDisponible = (c) => esContratada(c) || esOcupada(c);
   const nombreDe = (rol) => (st.nombres && st.nombres[rol]) || rol || "";
-  // WhatsApp se apaga cuando la candidata ya fue contratada
   function waBoton(c, clases, contenido) {
     if (noDisponible(c)) return `<span class="btn ${clases} btn-apagado" aria-disabled="true" title="Ya está contratada">${contenido}</span>`;
     return `<a class="btn ${clases}" href="${wa(c)}" target="_blank" rel="noopener">${contenido}</a>`;
@@ -149,23 +134,27 @@
     const dentro = (st.comparar[c.puesto] || []).includes(c.id);
     return `<button type="button" class="btn-comparar ${oscuro ? "oscuro" : ""} ${dentro ? "activo" : ""}" data-comparar="${c.id}" aria-pressed="${dentro}">${dentro ? "✓ En comparación" : "⇆ Comparar"}</button>`;
   }
+  function etapaPastilla(c) {
+    const e = etapaDe(c);
+    if (!e) return "";
+    return `<span class="etapa-pastilla e-${e}">${ETAPA_NOMBRE[e]}</span>`;
+  }
   function marcasHTML(c) {
-    const m = st.marcas[c.id] || {};
-    const quien = m.cuando && m.estado ? `<span class="quien">${esc(nombreDe(m.quien))} · ${fecha(m.cuando)}</span>` : "";
-    if (esOcupada(c)) {
-      return `<div class="marcas marcas-contratada" data-id="${c.id}"><span class="sello">Contratada en otra casa</span></div>`;
-    }
+    const m = marcaDe(c);
+    const quien = m.cuando && (m.estado || m.favorita) ? `<span class="quien">${esc(nombreDe(m.quien))} · ${fecha(m.cuando)}</span>` : "";
+    const fav = `<button type="button" data-favorita="${c.id}" class="${m.favorita ? "activo" : ""}" aria-pressed="${Boolean(m.favorita)}" title="Me gusta">★${m.favorita ? " Me gusta" : ""}</button>`;
+    if (esOcupada(c)) return `<div class="marcas marcas-contratada" data-id="${c.id}"><span class="sello">Contratada en otra casa</span></div>`;
     if (m.estado === "contratada") {
       return `<div class="marcas marcas-contratada" data-id="${c.id}"><span class="sello">✓ Contratada</span><button type="button" class="no-contratar" data-accion="no-contratar">No contratar</button>${quien}</div>`;
     }
-    return `<div class="marcas" data-id="${c.id}">${ESTADOS.map(([k, t]) => `<button type="button" data-estado="${k}" class="${m.estado === k ? "activo" : ""}" aria-pressed="${m.estado === k}">${t}</button>`).join("")}${quien}</div>`;
+    return `<div class="marcas" data-id="${c.id}">${fav}${ESTADOS.map(([k, t]) => `<button type="button" data-estado="${k}" class="${m.estado === k ? "activo" : ""}" aria-pressed="${m.estado === k}">${t}</button>`).join("")}${quien}</div>`;
   }
 
   /* ─── avisos ─── */
   let tAviso;
-  function aviso(t) {
+  function aviso(t, ms = 3000) {
     const a = $("#aviso"); $("span", a).textContent = t; a.classList.add("ver");
-    clearTimeout(tAviso); tAviso = setTimeout(() => a.classList.remove("ver"), 3000);
+    clearTimeout(tAviso); tAviso = setTimeout(() => a.classList.remove("ver"), ms);
   }
 
   /* ─── API ─── */
@@ -175,14 +164,17 @@
     const r = await fetch(API + ruta, cuerpo ? { method: "POST", headers, body: JSON.stringify(cuerpo) } : { headers });
     if (r.status === 401) { ponerLlave(""); location.replace(ENTRADA); throw new Error("sesion"); }
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || "error");
+    if (!r.ok) { const e = new Error(d.error || "error"); e.datos = d; throw e; }
     return d;
   }
 
   async function cargar() {
     const d = await api("/api/candidatas");
     st.yo = d.yo; st.nombres = d.nombres || {}; st.ocupadas = new Set(d.ocupadas || []); st.mensajes = d.mensajes || [];
-    st.marcas = d.marcas || {};
+    st.marcas = d.marcas || {}; st.eventos = d.eventos || []; st.sincronizaciones = d.sincronizaciones || []; st.crm = d.crm || null;
+    st.puestos = (d.puestos || []).filter((p) => p.activo !== 0 || st.yo.admin);
+    st.porPuesto = Object.fromEntries((d.puestos || []).map((p) => [p.id, p]));
+    for (const p of st.puestos) st.comparar[p.id] = st.comparar[p.id] || [];
     const lugares = {};
     st.todas = d.candidatas.map((c) => {
       const p = c.puesto || "domestica";
@@ -190,62 +182,101 @@
       return { ...c, puesto: p, lugar: c.nivel === "P" ? null : ++lugares[p] };
     });
     st.porId = Object.fromEntries(st.todas.map((c) => [c.id, c]));
+    if (!st.porPuesto[st.puesto]) st.puesto = st.puestos[0] ? st.puestos[0].id : "domestica";
     usarPuesto(st.puesto, false);
-    $("#saludo").textContent = `Candidatas para la casa · Hola, ${d.yo.nombre}`;
-    if (d.yo.admin) { $("#btn-agregar").classList.remove("oculto"); $("#btn-bitacora").classList.remove("oculto"); }
-    pintarTodo();
+    $("#saludo").textContent = `Hola, ${d.yo.nombre}`;
+    $("#saludo-movil").textContent = `Hola, ${d.yo.nombre}`;
+    $("#yo-inicial").textContent = (d.yo.nombre || "?")[0].toUpperCase();
+    $("#yo-nombre").textContent = d.yo.nombre;
+    $("#yo-casa").textContent = d.yo.admin ? "Administra la casa" : "Casa";
+    $$(".admin").forEach((e) => e.classList.toggle("oculto", !d.yo.admin));
+    cuentasMenu();
+    pintarPantalla();
     ruta();
+  }
+  function cuentasMenu() {
+    $("#n-candidatas").textContent = st.todas.length;
+    const enProceso = st.todas.filter((c) => ["contactada", "entrevista", "prueba"].includes(etapaDe(c))).length;
+    $("#n-proceso").textContent = enProceso || "";
+    $("#n-puestos").textContent = st.puestos.filter((p) => p.activo !== 0).length;
   }
 
   function usarPuesto(p, pintar = true) {
-    st.puesto = PUESTOS[p] ? p : "domestica";
+    st.puesto = st.porPuesto[p] ? p : st.puesto;
     st.lista = st.todas.filter((c) => c.puesto === st.puesto);
     st.total = st.lista.filter((c) => c.nivel !== "P").length;
     st.filtro = "todas"; st.verD = false;
-    $("#puestos").innerHTML = Object.entries(PUESTOS).map(([k, v]) => {
-      const n = st.todas.filter((c) => c.puesto === k).length;
-      return `<button class="puesto ${k === st.puesto ? "activo" : ""}" data-puesto="${k}" aria-pressed="${k === st.puesto}">${v.nombre}<b>${n}</b></button>`;
-    }).join("");
-    $("#hero-titulo").innerHTML = P().titulo;
-    $$(".como").forEach((e) => e.classList.toggle("oculto", e.dataset.puesto !== st.puesto));
-    if (pintar) { pintarTodo(); window.scrollTo(0, 0); }
+    guardar("talento-puesto", st.puesto);
+    if (pintar) { pintarPantalla(); window.scrollTo(0, 0); }
+  }
+  function selectorPuestos(conTodos = false) {
+    const activos = st.puestos.filter((p) => p.activo !== 0);
+    return `<nav class="puestos" aria-label="Puesto">${conTodos ? `<button class="puesto todos ${st.puesto === "*" ? "activo" : ""}" data-puesto="*" aria-pressed="${st.puesto === "*"}">Todos los puestos<b>${st.todas.length}</b></button>` : ""}${activos.map((p) => {
+      const n = st.todas.filter((c) => c.puesto === p.id).length;
+      return `<button class="puesto ${p.id === st.puesto ? "activo" : ""}" data-puesto="${p.id}" aria-pressed="${p.id === st.puesto}">${esc(p.nombre)}<b>${n}</b></button>`;
+    }).join("")}</nav>`;
   }
 
-  /* ─── hero: las tres mejores ─── */
+  /* ─── pantalla: candidatas ─── */
+  function pintarTablero() {
+    const v = $("#vista");
+    if (st.puesto === "*" || !st.porPuesto[st.puesto]) usarPuesto(st.puestos[0] ? st.puestos[0].id : "domestica", false);
+    v.innerHTML = `
+      ${selectorPuestos()}
+      <section class="cab"><div><div class="eyebrow">Las tres mejores · ${esc(P().nombre)}</div><h1 id="hero-titulo">${tituloDe(P())}</h1><p class="sub" id="hero-sub"></p></div>
+        <div class="cab-acciones">${st.yo.admin ? `<button class="btn btn-contorno btn-chico" id="btn-sync" title="Trae lo nuevo del CRM">↻ Traer del CRM</button><button class="btn btn-contorno btn-chico" id="btn-agregar">Agregar CSV</button>` : ""}</div></section>
+      <div class="podio" id="podio"></div>
+      <div class="mensaje-linea" id="mensaje-linea"></div>
+      <div class="herramientas">
+        <input class="buscar" id="buscar" type="search" placeholder="Buscar por nombre, colonia o palabra…" autocomplete="off" enterkeyhint="search" value="${esc(st.qTexto || "")}">
+        <div class="chips" id="chips-estado"></div>
+        <div class="resumen-filtro"><span id="resumen-filtro"></span><div class="vistas" role="group" aria-label="Vista"><button data-vista="tarjetas" class="${st.vista === "tarjetas" ? "activo" : ""}">Tarjetas</button><button data-vista="tabla" class="${st.vista === "tabla" ? "activo" : ""}">Tabla</button></div></div>
+      </div>
+      <div id="pendientes"></div>
+      <div id="secciones"></div>`;
+    pintarPodio(); pintarMensajeLinea(); pintarChips(); pintarLista(); piezas(); pintarBandeja();
+  }
+
   function pintarPodio() {
     const tres = st.lista.filter((c) => c.nivel === "A").slice(0, 3);
-    const n = st.total;
-    const filtros = st.lista.filter((c) => c.nivel === "A").length;
-    $("#hero-sub").textContent = P().sub(n, Math.max(0, filtros - 3));
+    const n = st.total, extra = Math.max(0, st.lista.filter((c) => c.nivel === "A").length - 3);
+    const pend = st.lista.filter((c) => c.nivel === "P").length;
+    $("#hero-sub").textContent = n ? `${n} candidatas ordenadas de mejor a peor.${tres.length ? ` Estas ${tres.length === 1 ? "es la que" : "son las que"} yo llamaría primero.` : ""}${extra ? ` Otras ${extra} también valen la llamada.` : ""}${pend ? ` Hay ${pend} nuevas por evaluar.` : ""}` : pend ? `${pend} candidatas nuevas por evaluar.` : "Todavía no llegan candidatas a este puesto.";
     $("#podio").innerHTML = tres.map((c, i) => `
       <article class="ficha ${noDisponible(c) ? "contratada" : ""}" data-id="${c.id}">
         <div class="ficha-lugar"><b>${i + 1}</b><span>${LUGARES[i]} opción · ${c.puntos} puntos</span></div>
         <div>
           <h2>${esc(c.nombre)}</h2>
-          <div class="ficha-meta">${[c.edad ? `${c.edad} años` : "", esc(c.colonia), esc(c.experiencia)].filter(Boolean).join(" · ")}</div>
+          <div class="ficha-meta">${[c.edad ? `${c.edad} años` : "", esc(c.colonia), c.experiencia && c.experiencia.length < 30 ? esc(c.experiencia) : ""].filter(Boolean).join(" · ")}</div>
         </div>
         <div class="ficha-tel tab">${tel(c.celular)}<small>Celular y WhatsApp${c.tel_extra ? ` · otro: ${tel(c.tel_extra)}` : ""}</small></div>
         <div class="ficha-acciones">
           ${waBoton(c, "btn-verde", `${ICONO_WA}WhatsApp`)}
-          <button class="btn btn-contorno-claro" data-abrir="${c.id}">Ver ficha completa</button>
+          <button class="btn btn-contorno" data-abrir="${c.id}">Ver ficha completa</button>
         </div>
-        ${botonComparar(c, true)}
         <div><h3>Por qué es la ${LUGARES[i]}</h3><p>${esc(c.resumen)}</p></div>
         ${c.a_favor ? `<div><h3>Lo que la hace brillar</h3><p class="tenue">${esc(c.a_favor)}</p></div>` : ""}
         ${marcasHTML(c)}
-      </article>`).join("");
+      </article>`).join("") || "";
+    $("#podio").classList.toggle("oculto", !tres.length);
+  }
+  function pintarMensajeLinea() {
+    const [, nombre] = opcionMensaje(st.puesto);
+    const el = $("#mensaje-linea"); if (!el) return;
+    el.innerHTML = `Mensaje de WhatsApp: <b>${esc(nombre)}</b> <button type="button" data-ir="mensajes">cambiar</button>`;
   }
 
   /* ─── lista ─── */
   function pasaFiltro(c) {
-    const m = st.marcas[c.id] || {};
+    const m = marcaDe(c);
     const f = st.filtro;
-    if (f === "favorita" || f === "contactada" || f === "entrevista" || f === "contratada" || f === "descartada") { if (m.estado !== f) return false; }
+    if (f === "favorita") { if (!m.favorita) return false; }
+    else if (f === "nueva") { if (m.estado) return false; }
+    else if (["contactada", "entrevista", "prueba", "contratada", "descartada"].includes(f)) { if (m.estado !== f) return false; }
     else if (f === "repetidas") { if (!(c.envios > 1)) return false; }
     else if (f === "recientes") { if (!reciente(c)) return false; }
     if (st.q) {
-      const t = [c.nombre, c.colonia, c.comidas, c.limpia, c.porque, c.resumen, c.referido, c.celular, m.nota, c.a_favor].join(" ")
-        .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+      const t = [c.nombre, c.colonia, c.comidas, c.limpia, c.porque, c.resumen, c.referido, c.celular, m.nota, c.a_favor].join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       if (!st.q.split(/\s+/).every((p) => t.includes(p))) return false;
     }
     return true;
@@ -253,13 +284,13 @@
 
   function tarjeta(c) {
     const v = veredicto(c);
-    const m = st.marcas[c.id] || {};
+    const m = marcaDe(c);
     return `
     <article class="tarjeta ${m.estado === "descartada" ? "marcada-descartada" : ""} ${noDisponible(c) ? "contratada" : ""}" data-id="${c.id}" tabindex="0" aria-label="Ver ficha de ${esc(c.nombre)}">
       <div class="t-fila">
         <div class="avatar n${c.nivel}">${esc(iniciales(c.nombre))}${c.lugar ? `<b>${c.lugar}</b>` : ""}</div>
         <div>
-          <div class="t-cab"><h3 class="t-nombre">${esc(c.nombre)}</h3><span class="veredicto v-${c.nivel}">${v.corto}</span></div>
+          <div class="t-cab"><h3 class="t-nombre">${esc(c.nombre)}</h3><span class="veredicto v-${c.nivel}">${v.corto}</span>${etapaPastilla(c)}</div>
           <div class="t-meta">${[esc(c.colonia), `Llenó ${fecha(c.ultimo_envio)} · ${hace(c.ultimo_envio)}`].filter(Boolean).join(" · ")}</div>
           <div class="insignias">${insignias(c)}</div>
           <p class="t-res">${esc(c.resumen || "—")}</p>
@@ -280,66 +311,79 @@
     ["A", "Llamar primero", "Las que yo metería a la casa. Empieza por aquí."],
     ["B", "Buenas opciones", "Vale la pena una llamada si las primeras no están disponibles."],
     ["C", "Con reservas", "Pueden servir, pero hay dudas importantes."],
-    ["D", "No las recomendamos", "No aceptan quedarse, o sus respuestas no dan confianza. Aquí están por si acaso."],
+    ["D", "No las recomendamos", "No aceptan el arreglo, o sus respuestas no dan confianza. Aquí están por si acaso."],
   ];
+
+  function filaTabla(c) {
+    const m = marcaDe(c);
+    return `<tr class="fila ${m.estado === "descartada" ? "apagada" : ""}" data-id="${c.id}" tabindex="0">
+      <td class="derecha tab">${c.lugar ?? "—"}</td>
+      <td class="nombre-celda">${m.favorita ? "★ " : ""}${esc(c.nombre)}</td>
+      <td class="derecha tab"><b>${c.puntos ?? "—"}</b></td>
+      <td><span class="veredicto v-${c.nivel}">${veredicto(c).corto}</span></td>
+      <td>${etapaPastilla(c) || `<span class="etapa-pastilla">Nueva</span>`}</td>
+      <td>${esc(c.colonia || "—")}</td>
+      <td>${c.edad ? `${c.edad}` : "—"}</td>
+      <td>${esc(c.experiencia && c.experiencia.length < 30 ? c.experiencia : "—")}</td>
+      <td class="tab">${fecha(c.ultimo_envio)}${c.envios > 1 ? ` · ×${c.envios}` : ""}</td>
+      <td>${waBoton(c, "btn-navy btn-chico", `${ICONO_WA}`)}</td>
+    </tr>`;
+  }
 
   function pintarLista() {
     const vis = st.lista.filter(pasaFiltro);
     const pend = vis.filter((c) => c.nivel === "P");
     $("#pendientes").innerHTML = pend.length ? `
       <section class="seccion"><div class="seccion-cab"><h2>Nuevas por evaluar · ${pend.length}</h2>
-      <p>Llegaron en el último archivo que subiste.</p>
+      <p>Llegaron en la última sincronización o archivo.</p>
       ${st.yo.admin ? `<button class="btn btn-navy btn-chico" id="btn-evaluar">Evaluar ahora</button>` : ""}</div>
-      <div class="lista">${pend.map(tarjeta).join("")}</div></section>` : "";
-    $("#secciones").innerHTML = SECCIONES.map(([n, t, sub]) => {
-      const cs = vis.filter((c) => c.nivel === n);
-      if (!cs.length) return "";
-      const plegada = n === "D" && !st.verD && !st.q && st.filtro === "todas";
-      return `<section class="seccion" id="sec-${n}">
-        <div class="seccion-cab"><h2>${t} · ${cs.length}</h2><p>${sub}</p></div>
-        ${plegada ? `<button class="btn btn-contorno" id="btn-ver-d">Ver las ${cs.length}</button>` : `<div class="lista">${cs.map(tarjeta).join("")}</div>`}
-      </section>`;
-    }).join("") || `<div class="vacio">Ninguna candidata coincide con este filtro.</div>`;
-    anchos($("main"));
+      ${st.vista === "tabla" ? `<div class="tabla-env"><table class="tabla"><thead><tr><th>#</th><th>Nombre</th><th>Puntos</th><th>Lectura</th><th>Etapa</th><th>Colonia</th><th>Edad</th><th>Experiencia</th><th>Llenó</th><th></th></tr></thead><tbody>${pend.map(filaTabla).join("")}</tbody></table></div>` : `<div class="lista">${pend.map(tarjeta).join("")}</div>`}</section>` : "";
+    if (st.vista === "tabla") {
+      const cs = vis.filter((c) => c.nivel !== "P");
+      $("#secciones").innerHTML = cs.length ? `<section class="seccion"><div class="tabla-env"><table class="tabla"><thead><tr><th>#</th><th>Nombre</th><th>Puntos</th><th>Lectura</th><th>Etapa</th><th>Colonia</th><th>Edad</th><th>Experiencia</th><th>Llenó</th><th></th></tr></thead><tbody>${cs.map(filaTabla).join("")}</tbody></table></div></section>` : (pend.length ? "" : `<div class="vacio">Ninguna candidata coincide con este filtro.</div>`);
+    } else {
+      $("#secciones").innerHTML = SECCIONES.map(([n, t, sub]) => {
+        const cs = vis.filter((c) => c.nivel === n);
+        if (!cs.length) return "";
+        const plegada = n === "D" && !st.verD && !st.q && st.filtro === "todas";
+        return `<section class="seccion" id="sec-${n}">
+          <div class="seccion-cab"><h2>${t} · ${cs.length}</h2><p>${sub}</p></div>
+          ${plegada ? `<button class="btn btn-contorno" id="btn-ver-d">Ver las ${cs.length}</button>` : `<div class="lista">${cs.map(tarjeta).join("")}</div>`}
+        </section>`;
+      }).join("") || (pend.length ? "" : `<div class="vacio">Ninguna candidata coincide con este filtro.</div>`);
+    }
+    anchos($("#vista"));
     const cuenta = vis.length === st.lista.length ? `${st.lista.length} candidatas` : `${vis.length} de ${st.lista.length} candidatas`;
-    const fav = Object.values(st.marcas).filter((m) => m.estado === "favorita").length;
-    $("#resumen-filtro").textContent = `${cuenta}${fav ? ` · ${fav} marcadas con “Me gusta”` : ""}`;
+    const fav = st.lista.filter((c) => marcaDe(c).favorita).length;
+    $("#resumen-filtro").textContent = `${cuenta}${fav ? ` · ${fav} con “Me gusta”` : ""}`;
   }
 
   function pintarChips() {
-    const ch = [["todas", "Todas"], ["favorita", "★ Me gusta"], ["contactada", "Contactadas"], ["entrevista", "Entrevista"], ["contratada", "Contratadas"], ["descartada", "Descartadas por ustedes"], ["repetidas", "Llenaron más de una vez"], ["recientes", "Recientes"]];
-    $("#chips-estado").innerHTML = ch.map(([k, t]) => `<button class="chip ${st.filtro === k ? "activo" : ""}" data-filtro="${k}">${t}</button>`).join("");
+    const n = (f) => st.lista.filter((c) => { const g = st.filtro; st.filtro = f; const ok = pasaFiltro(c); st.filtro = g; return ok; }).length;
+    const ch = [["todas", "Todas"], ["favorita", "★ Me gusta"], ["nueva", "Sin contactar"], ["contactada", "Contactadas"], ["entrevista", "Entrevista"], ["prueba", "Prueba"], ["contratada", "Contratadas"], ["descartada", "Descartadas"], ["repetidas", "Llenaron más de una vez"], ["recientes", "Recientes"]];
+    $("#chips-estado").innerHTML = ch.map(([k, t]) => { const c = k === "todas" ? 0 : n(k); return (k === "todas" || c) ? `<button class="chip ${st.filtro === k ? "activo" : ""}" data-filtro="${k}">${t}${c ? ` · ${c}` : ""}</button>` : ""; }).join("");
   }
 
   // Los anchos se ponen desde aquí: la política de seguridad bloquea estilos escritos en el HTML
   function anchos(raiz = document) { $$("[data-w]", raiz).forEach((e) => { e.style.width = `${e.dataset.w}%`; }); }
-  function pintarTodo() { pintarMensaje(); pintarPodio(); pintarChips(); pintarLista(); piezas(); pintarBandeja(); }
 
-  function pintarMensaje() {
-    const ops = MENSAJES[st.puesto] || MENSAJES.domestica;
-    const [clave, nombre] = opcionMensaje(st.puesto);
-    const texto = textoMensaje(st.puesto, clave);
-    const editado = (st.mensajes || []).some((m) => m.puesto === st.puesto && m.clave === clave);
-    $("#mensaje-bar").innerHTML = `
-      <div class="mensaje-cab"><span class="mensaje-t">Mensaje de WhatsApp</span><span class="mensaje-sub">Se precarga en todas las candidatas de ${esc(P().nombre.toLowerCase())}</span></div>
-      <div class="mensaje-ops" role="radiogroup" aria-label="Mensaje de WhatsApp">${ops.map(([k, n]) => `<button type="button" role="radio" aria-checked="${k === clave}" class="chip ${k === clave ? "activo" : ""}" data-mensaje="${k}">${esc(n)}</button>`).join("")}</div>
-      <p class="mensaje-vista">«${esc(texto.replace(/\{nombre\}/g, "María"))}»</p>
-      <div class="mensaje-pie"><button type="button" class="btn btn-contorno btn-chico" id="btn-editar-mensaje">Editar «${esc(nombre)}»</button>${editado ? `<span class="quien">Editado para su casa</span>` : ""}</div>`;
-  }
-  function editarMensaje() {
-    const [clave, nombre] = opcionMensaje(st.puesto);
-    $("#msg-titulo").textContent = `Editar «${nombre}» · ${P().nombre}`;
-    $("#msg-texto").value = textoMensaje(st.puesto, clave);
+  /* ─── mensajes de WhatsApp (edición) ─── */
+  function editarMensaje(puesto = st.puesto) {
+    const [clave, nombre] = opcionMensaje(puesto);
+    $("#msg-titulo").textContent = `Editar «${nombre}» · ${(st.porPuesto[puesto] || P()).nombre}`;
+    $("#msg-texto").value = textoMensaje(puesto, clave);
+    $("#dlg-mensaje").dataset.puesto = puesto;
     $("#dlg-mensaje").showModal();
   }
   async function guardarTexto(restaurar) {
-    const [clave] = opcionMensaje(st.puesto);
+    const puesto = $("#dlg-mensaje").dataset.puesto || st.puesto;
+    const [clave] = opcionMensaje(puesto);
     const texto = restaurar ? "" : $("#msg-texto").value.trim();
     if (!restaurar && !texto) { aviso("Escribe el mensaje o pica Restaurar"); return; }
     try {
-      await api("/api/mensaje", { puesto: st.puesto, clave, texto });
-      st.mensajes = (st.mensajes || []).filter((m) => !(m.puesto === st.puesto && m.clave === clave));
-      if (texto) st.mensajes.push({ puesto: st.puesto, clave, texto });
+      await api("/api/mensaje", { puesto, clave, texto });
+      st.mensajes = (st.mensajes || []).filter((m) => !(m.puesto === puesto && m.clave === clave));
+      if (texto) st.mensajes.push({ puesto, clave, texto });
       $("#dlg-mensaje").close();
       repintar();
       aviso(restaurar ? "Mensaje original restaurado" : "Mensaje guardado para toda su casa");
@@ -350,7 +394,7 @@
   function pintarBandeja() {
     const ids = st.comparar[st.puesto] || [];
     const b = $("#bandeja");
-    if (!ids.length) { b.classList.add("oculto"); return; }
+    if (!ids.length || st.puesto === "*") { b.classList.add("oculto"); return; }
     b.classList.remove("oculto");
     b.innerHTML = `<div class="bandeja-in">
       <span class="bandeja-t">Comparar</span>
@@ -372,19 +416,20 @@
     });
     pintarBandeja();
   }
+  const ultimoEnvio = (c) => { const e = c.envios_detalle || []; return e[c.destacado ?? -1] || e[e.length - 1] || c; };
   function vistaComparar() {
     const cs = (st.comparar[st.puesto] || []).map((id) => st.porId[id]).filter(Boolean);
-    const guia = st.puesto === "guia";
+    const p = P();
     const mejor = Math.max(...cs.map((c) => c.puntos || 0));
     const fila = (titulo, f, cls = "") => `<div class="cmp-fila ${cls}"><div class="cmp-t">${titulo}</div>${cs.map((c) => `<div class="cmp-c">${f(c)}</div>`).join("")}</div>`;
     const med = (nombre, k, max) => {
       const top = Math.max(...cs.map((c) => c[k] || 0));
-      return fila(nombre, (c) => `<div class="cmp-med ${(c[k] || 0) === top ? "top" : ""}"><span class="m-barra"><i data-w="${Math.round(((c[k] || 0) / max) * 100)}"></i></span><b>${c[k] ?? 0}/${max}</b></div>`);
+      return fila(esc(nombre), (c) => `<div class="cmp-med ${(c[k] || 0) === top ? "top" : ""}"><span class="m-barra"><i data-w="${Math.round(((c[k] || 0) / max) * 100)}"></i></span><b>${c[k] ?? 0}/${max}</b></div>`);
     };
-    const ult = (c) => { const e = c.envios_detalle || []; return e[c.destacado ?? -1] || e[e.length - 1] || c; };
+    const citas = ((p.rubrica && p.rubrica.citas) || []).slice(0, 3);
     return `
     <div class="fc-hero"><div class="fc-hero-in">
-      <div class="fc-nav"><button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver</span><span class="solo-escritorio"> a la lista</span></button><span class="fc-pos">${P().nombre}</span><button class="btn btn-contorno-claro btn-chico" data-pdf="comparar">⬇ <span>PDF</span></button></div>
+      <div class="fc-nav"><button class="btn btn-contorno-claro" data-cerrar-ficha>← <span>Volver</span><span class="solo-escritorio"> a la lista</span></button><span class="fc-pos">${esc(p.nombre)}</span><button class="btn btn-contorno-claro btn-chico" data-pdf="comparar">⬇ <span>PDF</span></button></div>
       <div class="eyebrow">Lado a lado</div>
       <h1 class="cmp-h1">Comparar ${cs.length} finalistas</h1>
       <p class="hero-sub">Lo más fuerte de cada una aparece marcado en verde. La de mayor puntaje lleva la corona.</p>
@@ -397,15 +442,14 @@
         <div class="cmp-puntos tab">${c.puntos ?? "—"}<small>/100</small></div>
         <div class="cmp-acciones">${waBoton(c, "btn-verde btn-chico", `${ICONO_WA}WhatsApp`)}<button class="btn btn-contorno btn-chico" data-abrir="${c.id}">Ver ficha</button></div>
       </div>`).join("")}</div>
-      ${PC(cs[0] || {}).medidores.map(([n, k, max]) => med(n, k, max)).join("")}
-      ${fila("Datos", (c) => [c.edad ? `${c.edad} años` : "", esc(c.colonia), guia ? "" : esc(c.experiencia)].filter(Boolean).join("<br>") || "—")}
+      ${medidoresDe(p).map(([n, k, max]) => med(n, k, max)).join("")}
+      ${fila("Datos", (c) => [c.edad ? `${c.edad} años` : "", esc(c.colonia), c.experiencia && c.experiencia.length < 30 ? esc(c.experiencia) : ""].filter(Boolean).join("<br>") || "—")}
       ${fila("Por qué está aquí", (c) => esc(c.resumen || "—"))}
       ${fila("Lo que la hace brillar", (c) => esc(c.a_favor || "—"), "bien")}
       ${fila("Lo que hay que confirmar", (c) => esc(c.a_cuidar || "—"), "ojo")}
       ${fila("Pregunta para la llamada", (c) => esc(c.preguntar || "—"))}
-      ${guia
-        ? fila("Experiencia real con niños", (c) => `«${esc(ult(c).exp_ninos || "—")}»`) + fila("Si la niña se frustra", (c) => `«${esc(ult(c).frustracion || "—")}»`)
-        : fila("Por qué es la mejor", (c) => `«${esc(ult(c).porque || "—")}»`) + fila("Lo primero que limpia", (c) => `«${esc(ult(c).limpia || "—")}»`) + fila("Lo que cocina", (c) => esc(ult(c).comidas || "—"))}
+      ${citas.map(([k, t]) => fila(esc(t), (c) => `«${esc(ultimoEnvio(c)[k] || "—")}»`)).join("")}
+      ${p.rubrica && p.rubrica.platillos ? fila("Lo que cocina", (c) => esc(ultimoEnvio(c)[p.rubrica.platillos] || "—")) : ""}
       ${fila("Referida por", (c) => esc(c.referido || "—"))}
       ${fila("Decisión de la casa", (c) => marcasHTML(c), "fila-decision")}
     </div></div>`;
@@ -438,7 +482,7 @@
     });
   }
   function confeti(x, y) {
-    const colores = ["#56EF9F", "#ffffff", "#2A89FB", "#2BC878", "#c9ffe2"];
+    const colores = ["#56EF9F", "#0039C8", "#2A89FB", "#2BC878", "#c9ffe2"];
     for (let i = 0; i < 46; i++) {
       const p = document.createElement("i");
       p.className = "confeti";
@@ -452,7 +496,7 @@
     }
   }
   function repintar() {
-    const y = window.scrollY; pintarTodo(); window.scrollTo(0, y);
+    const y = window.scrollY; cuentasMenu(); pintarPantalla(); window.scrollTo(0, y);
     if (!$("#ficha").classList.contains("oculto")) { const s = $("#ficha").scrollTop; ruta(); $("#ficha").scrollTop = s; }
   }
   async function compartirFicha(id) {
@@ -502,12 +546,10 @@
     }
     const ahora = new Date().toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
     hoja.insertAdjacentHTML("beforeend", `<p class="pdf-pie">Talento · documento privado · generado por ${esc(st.yo.nombre)} el ${esc(ahora)}</p>`);
-    // La librería copia la hoja a su propio espacio; basta con armarla sin pegarla a la página
     const anchoPx = 1180;
     hoja.style.width = `${anchoPx}px`;
     $$("details", hoja).forEach((d) => d.setAttribute("open", ""));
     anchos(hoja);
-    // Página del ancho exacto del diseño (a 96 ppp), con proporción de hoja A4
     const margen = 6;
     const anchoMm = anchoPx * 25.4 / 96 + margen * 2;
     const altoMm = horizontal ? anchoMm / 1.414 : anchoMm * 1.414;
@@ -530,18 +572,16 @@
     }
   }
   /* ─── RLR · contacto vCard 3.0 (el mismo formato del sistema comercial) ─── */
-  const PREFIJO = { domestica: "ED", guia: "GP" }; // Empleado Doméstico · Guía Pedagógica
   const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y"]);
   function partirNombre(nombre) {
     const w = String(nombre || "").trim().split(/\s+/).filter(Boolean);
     if (w.length <= 1) return { nombres: w.join(" "), apellidos: "" };
-    const cuantos = w.length === 2 ? 1 : 2;       // en México: apellido paterno y materno al final
+    const cuantos = w.length === 2 ? 1 : 2;
     let i = w.length - cuantos;
-    while (i > 1 && PARTICULAS.has(w[i - 1].toLowerCase())) i--; // «de la Hoya»
+    while (i > 1 && PARTICULAS.has(w[i - 1].toLowerCase())) i--;
     return { nombres: w.slice(0, i).join(" "), apellidos: w.slice(i).join(" ") };
   }
   const vesc = (t) => String(t ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-  // Dobla líneas a 75 bytes sin partir acentos (RFC 2425)
   function doblar(linea) {
     const enc = new TextEncoder(); const partes = []; let actual = "", bytes = 0, limite = 75;
     for (const ch of linea) {
@@ -552,57 +592,46 @@
     partes.push(actual);
     return partes.join("\r\n ");
   }
-  const SI_NO = (v) => (String(v || "").toLowerCase().startsWith("s") ? "Sí" : v ? "No" : "—");
+  // Preguntas y respuestas de un envío, con las etiquetas del puesto
+  function preguntasRespuestas(c, e) {
+    const vistas = new Set(); const out = [];
+    for (const p of PC(c).preguntas || []) {
+      if (vistas.has(p.clave)) continue;
+      const r = e[p.clave] ?? (p.clave in e ? "" : c[p.clave]);
+      if (r == null || r === "") continue;
+      vistas.add(p.clave); out.push([p.corta || p.etiqueta, r]);
+    }
+    for (const r of e.respuestas || []) if (r.r) out.push([r.p, r.r]);
+    out.push(["Referida por", e.referido || c.referido], ["Colonia", e.colonia || c.colonia]);
+    return out;
+  }
   function notaContacto(c) {
-    const e = (c.envios_detalle || [])[c.destacado ?? -1] || (c.envios_detalle || []).slice(-1)[0] || c;
-    const m = st.marcas[c.id] || {};
+    const e = ultimoEnvio(c);
+    const m = marcaDe(c);
     const v = veredicto(c);
     const lineas = [
       `Talento · ${PC(c).nombre}`,
       `${c.lugar ? `Lugar ${c.lugar} de ${st.total}` : "Nueva"} · ${c.puntos ?? "—"}/100 · ${v.largo}`,
       `Solicitud: ${fecha(c.ultimo_envio)}${c.envios > 1 ? ` · llenó ${c.envios} veces` : ""}`,
-      "",
-      "NUESTRA LECTURA",
-      c.resumen || "—",
-      `Lo que la hace brillar: ${c.a_favor || "—"}`,
-      `Lo que hay que confirmar: ${c.a_cuidar || "—"}`,
+      "", "NUESTRA LECTURA", c.resumen || "—",
+      `Lo que la hace brillar: ${c.a_favor || "—"}`, `Lo que hay que confirmar: ${c.a_cuidar || "—"}`,
       c.preguntar ? `Pregunta para la llamada: ${c.preguntar}` : "",
-      "",
-      `CALIFICACIÓN: ${PC(c).medidores.map(([n, k, max]) => `${n} ${c[k] ?? 0}/${max}`).join(" · ")}`,
-      "",
-      "SUS RESPUESTAS",
+      "", `CALIFICACIÓN: ${medidoresDe(PC(c)).map(([n, k, max]) => `${n} ${c[k] ?? 0}/${max}`).join(" · ")}`,
+      "", "SUS RESPUESTAS",
     ];
-    const qa = c.puesto === "guia" ? [
-      ["¿Cómo organizaría una tarde de 4 horas?", e.tarde], ["¿Qué hace si la niña se frustra o llora?", e.frustracion],
-      ["¿Qué significa acompañar su desarrollo?", e.desarrollo], ["Una experiencia real con niños pequeños", e.exp_ninos],
-      ["¿Qué es ser confiable dentro de un hogar?", e.confianza],
-    ] : [
-      ["¿Se queda a dormir de lunes a jueves?", SI_NO(c.dormir)], ["¿Entra lunes 8–9 y sale viernes 5–7?", SI_NO(c.horario)],
-      ["Años en casas particulares", c.experiencia], ["¿Le gusta convivir con niños de 4 años?", SI_NO(c.ninos)],
-      ["¿Tranquila y respetuosa en casa ajena?", SI_NO(c.tranquila)], ["Tres comidas que cocina muy bien", e.comidas],
-      ["Lo primero que limpia y por qué", e.limpia], ["Por qué es la mejor para el puesto", e.porque],
-    ];
-    for (const [pr, r] of qa) lineas.push(`${pr}`, `R: ${r || "—"}`, "");
-    lineas.push(`Colonia: ${c.colonia || "—"}`, `Referida por: ${c.referido || "—"}`);
-    if (m.estado) lineas.push(`Estado en la casa: ${(ESTADOS.find((x) => x[0] === m.estado) || ["", m.estado])[1].replace("★ ", "")}`);
+    for (const [pr, r] of preguntasRespuestas(c, e)) lineas.push(`${pr}`, `R: ${r || "—"}`, "");
+    if (m.estado) lineas.push(`Etapa en la casa: ${ETAPA_NOMBRE[m.estado] || m.estado}`);
     if (m.nota) lineas.push("", "NOTAS DE LA CASA", m.nota);
     return lineas.filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n").trim();
   }
   function vcard(c) {
-    const pre = PREFIJO[c.puesto] || "ED";
+    const pre = PC(c).prefijo || "TA";
     const { nombres, apellidos } = partirNombre(c.nombre);
     const ahora = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-    const L = [
-      "BEGIN:VCARD", "VERSION:3.0",
-      `N:${vesc(apellidos)};${vesc(`${pre} ${nombres}`)};;;`,
-      `FN:${vesc(`${pre} ${c.nombre}`)}`,
-      `ORG:Talento;${vesc(PC(c).nombre)}`,
-      `TITLE:${vesc(`Candidata a ${PC(c).nombre.toLowerCase()}`)}`,
-      `TEL;TYPE=CELL,VOICE,pref:+52${c.celular}`,
-    ];
+    const L = ["BEGIN:VCARD", "VERSION:3.0", `N:${vesc(apellidos)};${vesc(`${pre} ${nombres}`)};;;`, `FN:${vesc(`${pre} ${c.nombre}`)}`,
+      `ORG:Talento;${vesc(PC(c).nombre)}`, `TITLE:${vesc(`Candidata a ${PC(c).nombre.toLowerCase()}`)}`, `TEL;TYPE=CELL,VOICE,pref:+52${c.celular}`];
     if (c.tel_extra) L.push("item1.TEL:+52" + c.tel_extra, "item1.X-ABLabel:Otro número");
     if (c.correo && !/notengo/i.test(c.correo)) L.push(`EMAIL;TYPE=INTERNET,HOME:${vesc(c.correo)}`);
-    // Liga directa al chat de WhatsApp, sin mensaje: el contacto es independiente del tablero
     L.push(`item2.URL:https://wa.me/52${c.celular}`, "item2.X-ABLabel:WhatsApp");
     if (c.tel_extra) L.push(`item3.URL:https://wa.me/52${c.tel_extra}`, "item3.X-ABLabel:WhatsApp otro número");
     if (c.colonia) L.push(`ADR;TYPE=HOME:;;${vesc(c.colonia)};;;;México`);
@@ -612,7 +641,7 @@
   }
   function descargarContacto(id) {
     const c = st.porId[id]; if (!c) return;
-    const nombre = nombreArchivo(`${PREFIJO[c.puesto] || "ED"} ${c.nombre}`).replace(/\.pdf$/, ".vcf");
+    const nombre = nombreArchivo(`${PC(c).prefijo || "TA"} ${c.nombre}`).replace(/\.pdf$/, ".vcf");
     const url = URL.createObjectURL(new Blob([vcard(c)], { type: "text/vcard;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
@@ -631,7 +660,7 @@
     const { id, x, y } = porContratar || {}; if (!id) return;
     $("#dlg-contratar").close();
     try {
-      await guardarMarca(id, "contratada");
+      await guardarMarca(id, { estado: "contratada" });
       repintar();
       requestAnimationFrame(() => { animar(id, "contratar"); confeti(x, y); });
       aviso(`¡${st.porId[id].nombre} contratada!`);
@@ -640,7 +669,7 @@
   }
   async function liberar(id) {
     try {
-      await guardarMarca(id, "");
+      await guardarMarca(id, { estado: "" });
       repintar();
       requestAnimationFrame(() => animar(id, "liberar"));
       aviso(`${st.porId[id].nombre} vuelve a estar disponible`);
@@ -648,46 +677,40 @@
   }
 
   /* ─── ficha completa ─── */
-  function qaLista(e, puesto) {
-    const filas = puesto === "guia" ? [
-      ["Cómo organizaría una tarde de 4 horas", e.tarde], ["Qué hace si la niña se frustra o llora", e.frustracion],
-      ["Qué significa acompañar su desarrollo", e.desarrollo], ["Una experiencia real con niños pequeños", e.exp_ninos],
-      ["Qué es ser confiable dentro de un hogar", e.confianza], ["Referida por", e.referido], ["Colonia", e.colonia],
-    ] : [
-      ["¿Se queda a dormir de lunes a jueves?", e.dormir], ["¿Entra lunes 8–9 y sale viernes 5–7?", e.horario],
-      ["Años en casas particulares", e.experiencia], ["¿Le gusta convivir con niños de 4 años?", e.ninos],
-      ["¿Tranquila y respetuosa en casa ajena?", e.tranquila], ["Tres comidas que cocina muy bien", e.comidas],
-      ["Lo primero que limpia y por qué", e.limpia], ["Por qué es la mejor para el puesto", e.porque],
-      ["Referida por", e.referido], ["Colonia", e.colonia],
-    ];
-    return `<dl class="qa-lista">${filas.map(([p, r]) => `<div class="qa"><dt>${p}</dt><dd>${esc(r || "—")}</dd></div>`).join("")}</dl>`;
+  function qaLista(c, e) {
+    return `<dl class="qa-lista">${preguntasRespuestas(c, e).map(([p, r]) => `<div class="qa"><dt>${esc(p)}</dt><dd>${esc(r || "—")}</dd></div>`).join("")}</dl>`;
   }
-
   function platillos(txt) {
     const partes = String(txt || "").split(/\n|,|;|\/|\s-\s|(?:^|\s)-(?=\S)/).map((s) => s.trim().replace(/^[-–•\s]+|[.\s]+$/g, "")).filter((s) => s.length > 1);
     if (partes.length <= 1) return `<p class="cita-texto">${esc(txt || "—")}</p>`;
     return `<div class="platillos">${partes.slice(0, 12).map((p) => `<span class="platillo">${esc(p[0].toUpperCase() + p.slice(1))}</span>`).join("")}</div>`;
   }
-
   function cvs(txt) {
     const ligas = String(txt || "").split(/[,\s]+/).filter((u) => /^https:\/\/services\.leadconnectorhq\.com\//.test(u));
     if (!ligas.length) return "";
     return `<div class="cita-titulo">Currículum</div><div class="t-acciones">${ligas.map((u, i) => `<a class="btn btn-navy btn-chico" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Ver CV${ligas.length > 1 ? ` ${i + 1}` : ""}</a>`).join("")}</div>`;
   }
-  function check(ok, titulo, sub) {
+  function check(ok, titulo) {
     const si = String(ok || "").toLowerCase().startsWith("s");
-    return `<div class="check ${si ? "si" : "no"}"><i aria-hidden="true">${si ? "✓" : "✕"}</i><div>${titulo}<small>${si ? "Sí" : "No"}${sub ? ` · ${sub}` : ""}</small></div></div>`;
+    return `<div class="check ${si ? "si" : "no"}"><i aria-hidden="true">${si ? "✓" : "✕"}</i><div>${esc(titulo)}<small>${si ? "Sí" : "No"}</small></div></div>`;
+  }
+  function historiaDe(c) {
+    const ev = st.eventos.filter((e) => e.id === c.id);
+    if (!ev.length) return "";
+    return `<div class="historia">${ev.map((e) => `<div><b>${ETAPA_NOMBRE[e.a] || e.a || "Sin etapa"}</b><span>${esc(nombreDe(e.quien))} · ${fecha(e.cuando)}</span></div>`).join("")}</div>`;
   }
 
   function fichaCompleta(c) {
     const v = veredicto(c);
+    const p = PC(c), rub = p.rubrica || {};
     const i = st.lista.indexOf(c);
     const ant = st.lista[i - 1], sig = st.lista[i + 1];
-    const m = st.marcas[c.id] || {};
+    const m = marcaDe(c);
     const envios = c.envios_detalle || [];
-    const d = envios[c.destacado ?? -1] || envios[envios.length - 1] || c;
+    const d = ultimoEnvio(c);
     const otraSol = c.destacado != null && c.destacado !== envios.length - 1;
     const top = c.lugar && c.lugar <= 3 ? `Es la ${LUGARES[c.lugar - 1]} opción de las ${st.total}.` : "";
+    const citas = (rub.citas || []).filter(([k]) => d[k]);
     return `
     <div class="fc-hero"><div class="fc-hero-in">
       <div class="fc-nav">
@@ -699,12 +722,12 @@
       </div>
       <div class="fc-top">
         <div>
-          <div class="fc-lugar"><span class="num">${c.lugar ? `Lugar #${c.lugar}` : "Nueva"}</span><span class="veredicto v-${c.nivel}">${v.largo}</span><span class="insignia fuerte">${PC(c).nombre}</span></div>
+          <div class="fc-lugar"><span class="num">${c.lugar ? `Lugar #${c.lugar}` : "Nueva"}</span><span class="veredicto v-${c.nivel}">${v.largo}</span><span class="insignia fuerte">${esc(p.nombre)}</span>${etapaPastilla(c)}</div>
           <h1 id="fc-nombre">${esc(c.nombre)}</h1>
           <div class="fc-meta">
             ${c.edad ? `<span>${c.edad} años</span>` : ""}
             ${c.colonia ? `<span>${esc(c.colonia)}</span>` : ""}
-            ${c.experiencia ? `<span>${esc(c.experiencia)} en casas</span>` : ""}
+            ${c.experiencia && c.experiencia.length < 30 ? `<span>${esc(c.experiencia)}</span>` : ""}
             <span>${c.envios > 1 ? `Llenó ${c.envios} veces · última ${fecha(c.ultimo_envio)}` : `Llenó el ${fecha(c.ultimo_envio)}`} · ${hace(c.ultimo_envio)}</span>
           </div>
           <div class="fc-contacto">
@@ -738,41 +761,24 @@
         <section class="panel">
           <h2>En sus palabras</h2>
           <p class="sub">Lo que ella escribió${c.envios > 1 ? (otraSol ? ` en su solicitud del ${fecha(d.fecha)}, la que mejor la representa` : " en su solicitud más reciente") : " en su solicitud"}, tal cual.</p>
-          ${c.puesto === "guia" ? `
-          <div class="cita-titulo">Una experiencia real con niños pequeños</div>
-          <blockquote class="cita"><p>«${esc(d.exp_ninos || "—")}»</p></blockquote>
-          <div class="cita-titulo">Si la niña se frustra o llora</div>
-          <blockquote class="cita"><p>«${esc(d.frustracion || "—")}»</p></blockquote>
-          <div class="cita-titulo">Cómo organizaría una tarde de 4 horas</div>
-          <blockquote class="cita"><p>«${esc(d.tarde || "—")}»</p></blockquote>
-          <div class="cita-titulo">Qué es ser confiable dentro de un hogar</div>
-          <blockquote class="cita"><p>«${esc(d.confianza || "—")}»</p></blockquote>
-          ${cvs(d.cv)}` : `
-          <div class="cita-titulo">Por qué cree que es la mejor para el puesto</div>
-          <blockquote class="cita"><p>«${esc(d.porque || "—")}»</p></blockquote>
-          <div class="cita-titulo">Lo primero que limpia al llegar, y por qué</div>
-          <blockquote class="cita"><p>«${esc(d.limpia || "—")}»</p></blockquote>
-          <div class="cita-titulo">Lo que cocina muy bien</div>
-          ${platillos(d.comidas)}`}
+          ${citas.map(([k, t]) => `<div class="cita-titulo">${esc(t)}</div><blockquote class="cita"><p>«${esc(d[k])}»</p></blockquote>`).join("")}
+          ${rub.platillos && d[rub.platillos] ? `<div class="cita-titulo">Lo que cocina muy bien</div>${platillos(d[rub.platillos])}` : ""}
+          ${!citas.length && !(rub.platillos && d[rub.platillos]) ? qaLista(c, d) : ""}
+          ${cvs(d.cv)}
         </section>
 
-        ${c.puesto === "guia" ? "" : `<section class="panel">
+        ${(rub.checks || []).length ? `<section class="panel">
           <h2>El arreglo de la casa</h2>
           <p class="sub">Lo que contestó sobre el horario y la convivencia.</p>
-          <div class="checks">
-            ${check(c.dormir, "Se queda a dormir de lunes a jueves")}
-            ${check(c.horario, "Entra lunes 8 a 9, sale viernes 5 a 7")}
-            ${check(c.ninos, "Le gusta convivir con una niña de 4 años")}
-            ${check(c.tranquila, "Se considera tranquila y respetuosa")}
-          </div>
-        </section>`}
+          <div class="checks">${rub.checks.map(([k, t]) => check(c[k] ?? d[k], t)).join("")}</div>
+        </section>` : ""}
 
         ${envios.length > 1 ? `<section class="panel">
           <h2>Sus ${envios.length} solicitudes</h2>
           <p class="sub">Llenó el formulario más de una vez. Aquí está cada envío completo.</p>
           <div class="lineatiempo">${envios.slice().reverse().map((e, k) => `
-            <details class="lt-envio" ${k === 0 ? "open" : ""}><summary>Solicitud del ${fecha(e.fecha)}<span>${e.fecha ? e.fecha.slice(11, 16) + " h" : ""}</span></summary>${qaLista(e, c.puesto)}</details>`).join("")}
-          </div></section>` : `<section class="panel"><h2>Su solicitud completa</h2><p class="sub">Todas sus respuestas.</p>${qaLista(envios[0] || c, c.puesto)}</section>`}
+            <details class="lt-envio" ${k === 0 ? "open" : ""}><summary>Solicitud del ${fecha(e.fecha)}<span>${e.fecha ? e.fecha.slice(11, 16) + " h" : ""}</span></summary>${qaLista(c, e)}</details>`).join("")}
+          </div></section>` : `<section class="panel"><h2>Su solicitud completa</h2><p class="sub">Todas sus respuestas.</p>${qaLista(c, envios[0] || c)}</section>`}
       </div>
 
       <aside class="fc-lado">
@@ -783,6 +789,7 @@
           <div class="nota"><label for="nota-${c.id}">Notas de la llamada</label>
             <textarea id="nota-${c.id}" data-nota="${c.id}" placeholder="Ej. Contestó rápido, puede empezar el lunes…">${esc(m.nota || "")}</textarea>
             <small id="nota-estado-${c.id}">${m.nota && m.cuando ? `Guardado ${fecha(m.cuando)}` : "Se guarda solo"}</small></div>
+          ${historiaDe(c)}
           <div class="compartir-caja" id="compartir-${c.id}">
             <button class="btn btn-contorno btn-chico" data-compartir="${c.id}">Compartir esta ficha</button>
             <small>Crea un enlace privado solo de ella, sin acceso al tablero. Vence en 7 días.</small>
@@ -797,18 +804,35 @@
             <div class="dato"><span>Edad</span>${c.edad ? `${c.edad} años · nació el ${fecha(c.nacimiento)}` : "No la dio"}</div>
             <div class="dato"><span>Colonia</span>${esc(c.colonia || "—")}</div>
             <div class="dato"><span>Referida por</span>${esc(c.referido || "—")}</div>
-            <div class="dato"><span>Evaluación</span>${c.evaluo === "claude-auto" ? "Automática con Claude" : c.evaluo === "claude-revision" ? "Revisada una por una" : "Pendiente"}</div>
+            <div class="dato"><span>Formulario</span>${esc(nombreFormulario(c))}</div>
+            <div class="dato"><span>Evaluación</span>${c.evaluo === "claude-auto" ? "Automática con Claude" : c.evaluo === "claude-revision" ? "Revisada una por una" : c.evaluo === "error" ? "Falló, se reintenta" : "Pendiente"}</div>
           </div>
         </section>
       </aside>
     </div>`;
   }
+  function nombreFormulario(c) {
+    const p = PC(c);
+    const f = (p.formularios || []).find((x) => x.id === c.formulario);
+    return f ? f.nombre : (p.formularios && p.formularios[0] ? p.formularios[0].nombre : p.nombre);
+  }
 
+  /* ─── rutas ─── */
+  const PANTALLAS = { tablero: pintarTablero };
+  function pintarPantalla() {
+    const nombre = st.pantalla;
+    const fn = PANTALLAS[nombre] || (window.TalentoPantallas && window.TalentoPantallas[nombre]) || pintarTablero;
+    $$(".sidebar-item[data-ir]").forEach((a) => a.classList.toggle("activo", a.dataset.ir === nombre));
+    fn($("#vista"));
+    anchos($("#vista"));
+    document.title = `${nombre === "tablero" ? "Candidatas" : $(`.sidebar-item[data-ir="${nombre}"] .titulo`)?.textContent || "Talento"} · Talento`;
+  }
+  const RUTAS = { "": "tablero", tablero: "tablero", embudo: "embudo", analitica: "analitica", puestos: "puestos", mensajes: "mensajes", como: "como", entradas: "entradas" };
   function ruta() {
-    const m = location.hash.match(/^#\/c\/((?:[a-z]+-)?\d{10})$/);
+    const h = location.hash.replace(/^#\/?/, "");
     const f = $("#ficha");
-    if (location.hash === "#/comparar") {
-      if ((st.comparar[st.puesto] || []).length < 2) { history.replaceState(null, "", location.pathname); }
+    if (h === "comparar") {
+      if ((st.comparar[st.puesto] || []).length < 2) { history.replaceState(null, "", location.pathname + "#/"); }
       else {
         f.innerHTML = vistaComparar(); f.classList.remove("contratada");
         f.classList.remove("oculto"); f.scrollTop = 0; anchos(f);
@@ -816,18 +840,28 @@
         return;
       }
     }
+    const m = h.match(/^c\/((?:[a-z0-9_-]+-)?\d{10})$/);
     const c = m && st.porId[m[1]];
-    if (c && c.puesto !== st.puesto) usarPuesto(c.puesto);
-    if (!c) { f.classList.add("oculto"); f.innerHTML = ""; document.body.classList.remove("con-ficha"); return; }
-    f.innerHTML = fichaCompleta(c);
-    f.classList.toggle("contratada", noDisponible(c));
-    f.classList.remove("oculto"); f.scrollTop = 0; anchos(f); piezas();
-    document.body.classList.add("con-ficha");
-    const b = $("[data-cerrar-ficha]", f); if (b) b.focus({ preventScroll: true });
-    document.title = `${c.nombre} · Talento`;
+    if (c) {
+      if (c.puesto !== st.puesto) usarPuesto(c.puesto, false);
+      f.innerHTML = fichaCompleta(c);
+      f.classList.toggle("contratada", noDisponible(c));
+      f.classList.remove("oculto"); f.scrollTop = 0; anchos(f); piezas();
+      document.body.classList.add("con-ficha");
+      const b = $("[data-cerrar-ficha]", f); if (b) b.focus({ preventScroll: true });
+      document.title = `${c.nombre} · Talento`;
+      return;
+    }
+    f.classList.add("oculto"); f.innerHTML = ""; document.body.classList.remove("con-ficha");
+    const pantalla = RUTAS[h.split("/")[0]] || "tablero";
+    if (pantalla !== st.pantalla || !$("#vista").children.length) {
+      if (pantalla === "entradas" && !(st.yo && st.yo.admin)) { history.replaceState(null, "", location.pathname + "#/"); st.pantalla = "tablero"; }
+      else st.pantalla = pantalla;
+      pintarPantalla();
+      window.scrollTo(0, 0);
+    }
+    $("#app").classList.remove("menu-abierto"); $("#abrir-menu").setAttribute("aria-expanded", "false");
   }
-  // Abrir una ficha desde la lista agrega un paso al historial, así el botón de regresar del celular la cierra.
-  // Pasar a la anterior o siguiente reemplaza ese paso para no llenar el historial.
   function irA(hash) {
     const abierta = !$("#ficha").classList.contains("oculto");
     if (abierta && history.state && history.state.talento) history.replaceState({ talento: true }, "", hash);
@@ -836,18 +870,17 @@
   }
   function abrir(id) { irA(`#/c/${id}`); }
   function cerrarFicha() {
-    document.title = "Talento · Casa";
     if (history.state && history.state.talento) { history.back(); return; }
-    history.replaceState(null, "", location.pathname);
+    history.replaceState(null, "", location.pathname + "#/" + (st.pantalla === "tablero" ? "" : st.pantalla));
     ruta();
   }
+  function ir(pantalla) { location.hash = pantalla === "tablero" ? "#/" : `#/${pantalla}`; }
 
   /* ─── marcar y notas ─── */
-  async function guardarMarca(id, estado, nota) {
-    const previo = st.marcas[id] || {};
-    const cuerpo = { id, estado: estado ?? previo.estado ?? "", nota: nota ?? previo.nota ?? "" };
-    const d = await api("/api/marca", cuerpo);
+  async function guardarMarca(id, cambios) {
+    const d = await api("/api/marca", { id, ...cambios });
     st.marcas[id] = d.marca;
+    if (d.evento) st.eventos.push(d.evento);
     return d.marca;
   }
   const tNota = {};
@@ -855,23 +888,19 @@
   /* ─── importar CSV (solo Ricardo) ─── */
   function parseCSV(t) {
     const filas = []; let fila = [], campo = "", q = false;
-    t = t.replace(/^﻿/, "");
+    t = t.replace(/^\uFEFF/, "");
     for (let i = 0; i < t.length; i++) {
       const ch = t[i];
-      if (q) {
-        if (ch === '"') { if (t[i + 1] === '"') { campo += '"'; i++; } else q = false; }
-        else campo += ch;
-      } else if (ch === '"') q = true;
+      if (q) { if (ch === '"') { if (t[i + 1] === '"') { campo += '"'; i++; } else q = false; } else campo += ch; }
+      else if (ch === '"') q = true;
       else if (ch === ",") { fila.push(campo); campo = ""; }
-      else if (ch === "\n" || ch === "\r") {
-        if (ch === "\r" && t[i + 1] === "\n") i++;
-        fila.push(campo); filas.push(fila); fila = []; campo = "";
-      } else campo += ch;
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && t[i + 1] === "\n") i++; fila.push(campo); filas.push(fila); fila = []; campo = ""; }
+      else campo += ch;
     }
     if (campo || fila.length) { fila.push(campo); filas.push(fila); }
     return filas.filter((f) => f.some((x) => x.trim()));
   }
-  const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[¿?¡!]/g, "").replace(/\s+/g, " ").trim();
   const MES = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   function fechaCSV(s) {
     s = String(s || "").trim();
@@ -882,36 +911,38 @@
     const p = (n) => String(n).padStart(2, "0");
     return `${m[3]}-${p(MES[m[1].toLowerCase()])}-${p(m[2])}T${p(h)}:${m[5]}:00`;
   }
-  function filasDe(texto) {
+  // RLR · lee un export del CRM con las preguntas del puesto elegido: la columna se reconoce por su etiqueta
+  function filasDe(texto, puesto) {
     const t = parseCSV(texto); if (t.length < 2) return [];
     const cab = t[0].map(norm);
     const col = (...pruebas) => cab.findIndex((h) => pruebas.some((p) => (p instanceof RegExp ? p.test(h) : h === p)));
     const ix = {
-      nombre: col("nombre (s)", "first name"), apellido: col("apellido paterno y materno", "last name"),
-      celular: col("celular personal", "phone"), correo: col("correo", "email"), tel_extra: col("telefono extra"),
-      nacimiento: col(/fecha de nacimiento/), referido: col("referido por"), fecha: col("submission date", "created"),
-      colonia: col(/colonia/), dormir: col(/dormir/), horario: col(/puedes entrar/), experiencia: col(/cuantos anos/),
-      ninos: col(/ninos pequenos/), tranquila: col(/tranquila/), comidas: col(/comidas/), limpia: col(/primero que limpias/),
-      porque: col(/mejor persona/),
-      tarde: col(/tarde ideal/), frustracion: col(/frustracion/), desarrollo: col(/desarrollo infantil/),
-      exp_ninos: col(/experiencia real con ninos/), confianza: col(/confianza dentro/), cv: col(/curri/),
+      nombre: col("nombre (s)", "first name", "first_name", "nombre"), apellido: col("apellido paterno y materno", "last name", "last_name", "apellidos"),
+      celular: col("celular personal", "phone", "telefono", "celular"), correo: col("correo", "email", "correo electronico"), tel_extra: col("telefono extra"),
+      nacimiento: col(/fecha de nacimiento|date_of_birth/), referido: col("referido por"), fecha: col("submission date", "created", "enviado el", "created at", "fecha"),
+      colonia: col(/colonia/), cv: col(/curri|hoja de vida/),
     };
-    if (ix.celular < 0 || (ix.limpia < 0 && ix.tarde < 0)) return [];
-    const v = (f, k) => (ix[k] >= 0 ? String(f[ix[k]] || "").replace(/^="?|"$/g, "").trim() : "");
-    return t.slice(1).map((f) => ({
-      nombre: `${v(f, "nombre")} ${v(f, "apellido")}`.trim(), celular: v(f, "celular"), correo: v(f, "correo"),
-      tel_extra: v(f, "tel_extra"), nacimiento: v(f, "nacimiento"), referido: v(f, "referido"), fecha: fechaCSV(v(f, "fecha")),
-      colonia: v(f, "colonia"), dormir: v(f, "dormir"), horario: v(f, "horario"), experiencia: v(f, "experiencia"),
-      ninos: v(f, "ninos"), tranquila: v(f, "tranquila"), comidas: v(f, "comidas"), limpia: v(f, "limpia"), porque: v(f, "porque"),
-      tarde: v(f, "tarde"), frustracion: v(f, "frustracion"), desarrollo: v(f, "desarrollo"), exp_ninos: v(f, "exp_ninos"),
-      confianza: v(f, "confianza"), cv: v(f, "cv"),
-    })).filter((r) => r.celular);
+    if (ix.celular < 0) return [];
+    const pregs = (puesto.preguntas || []).map((p) => ({ ...p, i: cab.findIndex((h) => h === norm(p.etiqueta) || (norm(p.etiqueta).length > 12 && h.includes(norm(p.etiqueta).slice(0, 40)))) })).filter((p) => p.i >= 0);
+    if (!pregs.length && !["domestica", "finde", "guia"].includes(puesto.id)) { /* se aceptan de todos modos: quedan como respuestas sueltas */ }
+    const conocidas = new Set([...Object.values(ix).filter((i) => i >= 0), ...pregs.map((p) => p.i)]);
+    const v = (f, i) => (i >= 0 ? String(f[i] || "").replace(/^="?|"$/g, "").trim() : "");
+    return t.slice(1).map((f) => {
+      const fila = {
+        nombre: `${v(f, ix.nombre)} ${v(f, ix.apellido)}`.trim(), celular: v(f, ix.celular), correo: v(f, ix.correo), tel_extra: v(f, ix.tel_extra),
+        nacimiento: v(f, ix.nacimiento), referido: v(f, ix.referido), fecha: fechaCSV(v(f, ix.fecha)), colonia: v(f, ix.colonia), cv: v(f, ix.cv), respuestas: [],
+      };
+      for (const p of pregs) if (fila[p.clave] == null || !fila[p.clave]) fila[p.clave] = v(f, p.i);
+      // Columnas con texto que no reconocimos: se guardan tal cual con su encabezado
+      t[0].forEach((h, i) => { if (!conocidas.has(i) && !/^(id|contact ?id|timezone|ip|source|form|url|tags|owner)/i.test(h.trim()) && v(f, i) && v(f, i).length > 1) fila.respuestas.push({ p: h.trim(), r: v(f, i) }); });
+      return fila;
+    }).filter((r) => r.celular);
   }
   async function importar(archivos) {
+    if (st.puesto === "*") { aviso("Elige un puesto antes de subir el archivo"); return; }
     let filas = [];
-    for (const a of archivos) filas = filas.concat(filasDe(await a.text()));
+    for (const a of archivos) filas = filas.concat(filasDe(await a.text(), P()));
     if (!filas.length) { aviso("Ese archivo no parece un export del formulario"); return; }
-    // formulario primero (trae fechas), luego contactos
     filas.sort((a, b) => (b.fecha ? 1 : 0) - (a.fecha ? 1 : 0) || String(a.fecha).localeCompare(String(b.fecha)));
     aviso(`Subiendo ${filas.length} filas como ${P().nombre}…`);
     const tot = { nuevas: 0, volvieron: 0, sinCambio: 0 };
@@ -919,7 +950,7 @@
       const r = await api("/api/importar", { filas: filas.slice(i, i + 200), puesto: st.puesto });
       tot.nuevas += r.nuevas; tot.volvieron += r.volvieron; tot.sinCambio += r.sinCambio;
     }
-    aviso(`${tot.nuevas} nuevas · ${tot.volvieron} volvieron a llenar · ${tot.sinCambio} sin cambios`);
+    aviso(`${tot.nuevas} nuevas · ${tot.volvieron} volvieron a llenar · ${tot.sinCambio} sin cambios`, 5000);
     await cargar();
     if (tot.nuevas + tot.volvieron) await evaluar(false);
   }
@@ -930,13 +961,31 @@
       let r = await api("/api/evaluar", { reintentar });
       let hechas = 0;
       while (r.evaluada) {
-        hechas++; aviso(`Claude evaluó a ${r.nombre}${r.ok ? "" : ` (falló: ${r.error})`} · quedan ${r.quedan}`);
+        hechas++; aviso(`Claude evaluó a ${r.nombre}${r.ok ? "" : ` (falló: ${r.error})`} · quedan ${r.quedan}`, 6000);
         if (!r.quedan) break;
         r = await api("/api/evaluar", {});
       }
       if (hechas) await cargar(); else aviso("No hay candidatas pendientes");
     } catch { aviso("No se pudo evaluar. Intenta de nuevo."); }
     evaluando = false;
+  }
+  let sincronizando = false;
+  async function sincronizar(puesto) {
+    if (sincronizando) return; sincronizando = true;
+    aviso("Trayendo lo nuevo del CRM…", 20000);
+    try {
+      const r = await api("/api/sync", puesto ? { puesto } : {});
+      const n = r.puestos.reduce((a, p) => a + (p.nuevas || 0), 0), v = r.puestos.reduce((a, p) => a + (p.volvieron || 0), 0);
+      const fallas = r.puestos.filter((p) => p.error);
+      aviso(`CRM: ${n} nuevas · ${v} volvieron a llenar${fallas.length ? ` · ${fallas.length} formularios con error` : ""}`, 6000);
+      await cargar();
+      if (n + v) await evaluar(false);
+    } catch (e) {
+      const d = e.datos || {};
+      if (d.error === "sin llave") { aviso("Falta la llave del CRM de la subcuenta Talento. Mira la pantalla Puestos.", 7000); ir("puestos"); }
+      else aviso("No se pudo sincronizar. Intenta de nuevo.");
+    }
+    sincronizando = false;
   }
 
   /* ─── tamaño de letra ─── */
@@ -951,14 +1000,18 @@
   /* ─── eventos ─── */
   document.addEventListener("click", async (ev) => {
     const t = ev.target;
+    const bIr = t.closest("[data-ir]");
+    if (bIr) { ev.preventDefault(); ir(bIr.dataset.ir); return; }
     const bMsg = t.closest("[data-mensaje]");
     if (bMsg) {
-      guardar(`talento-mensaje-${st.puesto}`, bMsg.dataset.mensaje);
+      const pu = bMsg.dataset.puestoMsg || st.puesto;
+      guardar(`talento-mensaje-${pu}`, bMsg.dataset.mensaje);
       repintar();
-      aviso(`WhatsApp con mensaje «${opcionMensaje(st.puesto)[1]}»`);
+      aviso(`WhatsApp con mensaje «${opcionMensaje(pu)[1]}»`);
       return;
     }
-    if (t.id === "btn-editar-mensaje") { editarMensaje(); return; }
+    const bEd = t.closest("[data-editar-mensaje]");
+    if (bEd) { editarMensaje(bEd.dataset.editarMensaje); return; }
     if (t.id === "btn-msg-guardar") { guardarTexto(false); return; }
     if (t.id === "btn-msg-restaurar") { guardarTexto(true); return; }
     const bVcf = t.closest("[data-vcf]");
@@ -980,6 +1033,14 @@
     const bNo = t.closest("[data-accion='no-contratar']");
     if (bNo) { ev.stopPropagation(); liberar(bNo.closest(".marcas").dataset.id); return; }
     if (t.id === "btn-si-contratar") { contratar(); return; }
+    const bFav = t.closest("[data-favorita]");
+    if (bFav) {
+      ev.stopPropagation();
+      const id = bFav.dataset.favorita;
+      try { await guardarMarca(id, { favorita: !(marcaDe(st.porId[id]).favorita) }); aviso(st.marcas[id].favorita ? "Marcada con “Me gusta”" : "“Me gusta” quitado"); repintar(); }
+      catch { aviso("No se guardó. Revisa tu conexión."); }
+      return;
+    }
     const bMarca = t.closest(".marcas button[data-estado]");
     if (bMarca) {
       ev.stopPropagation();
@@ -989,13 +1050,12 @@
         pedirContratar(id, r.left + r.width / 2, r.top + r.height / 2);
         return;
       }
-      const actual = (st.marcas[id] || {}).estado;
+      const actual = marcaDe(st.porId[id]).estado;
       const nuevo = actual === bMarca.dataset.estado ? "" : bMarca.dataset.estado;
       try {
-        await guardarMarca(id, nuevo);
-        aviso(nuevo ? `Marcada: ${ESTADOS.find((e) => e[0] === nuevo)[1].replace("★ ", "")}` : "Marca quitada");
-        const y = window.scrollY; pintarTodo(); window.scrollTo(0, y);
-        if (!$("#ficha").classList.contains("oculto")) { const s = $("#ficha").scrollTop; ruta(); $("#ficha").scrollTop = s; }
+        await guardarMarca(id, { estado: nuevo });
+        aviso(nuevo ? `Etapa: ${ETAPA_NOMBRE[nuevo]}` : "Regresa a nueva");
+        repintar();
       } catch { aviso("No se guardó. Revisa tu conexión."); }
       return;
     }
@@ -1003,60 +1063,63 @@
     const bAbrir = t.closest("[data-abrir]");
     if (bAbrir) { abrir(bAbrir.dataset.abrir); return; }
     if (t.closest("[data-cerrar-ficha]")) { cerrarFicha(); return; }
-    const card = t.closest(".tarjeta, .ficha");
-    if (card && !t.closest("button")) { abrir(card.dataset.id); return; }
-    const bPuesto = t.closest("[data-puesto]");
-    if (bPuesto && bPuesto.classList.contains("puesto")) { usarPuesto(bPuesto.dataset.puesto); return; }
+    const card = t.closest(".tarjeta, .ficha, tr.fila");
+    if (card && !t.closest("button, select, input, textarea")) { abrir(card.dataset.id); return; }
+    const bPuesto = t.closest("button.puesto[data-puesto]");
+    if (bPuesto) { st.puesto = bPuesto.dataset.puesto; if (st.puesto !== "*") usarPuesto(st.puesto); else { st.lista = st.todas; pintarPantalla(); } return; }
     const chip = t.closest("[data-filtro]");
     if (chip) { st.filtro = chip.dataset.filtro; pintarChips(); pintarLista(); return; }
+    const bVista = t.closest("[data-vista]");
+    if (bVista) { st.vista = bVista.dataset.vista; guardar("talento-vista", st.vista); pintarTablero(); return; }
     if (t.id === "btn-ver-d") { st.verD = true; pintarLista(); return; }
     if (t.id === "btn-evaluar") { evaluar(true); return; }
+    if (t.id === "btn-agregar") { $("#archivo").click(); return; }
+    if (t.id === "btn-sync") { sincronizar(); return; }
+    if (t.id === "abrir-menu") { const ab = $("#app").classList.toggle("menu-abierto"); t.setAttribute("aria-expanded", ab); return; }
     if (t.closest("[data-cerrar]")) { t.closest("dialog").close(); }
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("#ficha").classList.contains("oculto")) cerrarFicha();
-    if (e.key === "Enter" && e.target.classList && e.target.classList.contains("tarjeta")) abrir(e.target.dataset.id);
+    if (e.key === "Enter" && e.target.classList && (e.target.classList.contains("tarjeta") || e.target.classList.contains("fila"))) abrir(e.target.dataset.id);
   });
   document.addEventListener("input", (e) => {
     const id = e.target.dataset && e.target.dataset.nota;
-    if (!id) return;
-    const est = $(`#nota-estado-${id}`); if (est) est.textContent = "Escribiendo…";
-    clearTimeout(tNota[id]);
-    tNota[id] = setTimeout(async () => {
-      try { await guardarMarca(id, undefined, e.target.value); if (est) est.textContent = "Guardado ✓"; }
-      catch { if (est) est.textContent = "No se guardó"; }
-    }, 800);
+    if (id) {
+      const est = $(`#nota-estado-${id}`); if (est) est.textContent = "Escribiendo…";
+      clearTimeout(tNota[id]);
+      tNota[id] = setTimeout(async () => {
+        try { await guardarMarca(id, { nota: e.target.value }); if (est) est.textContent = "Guardado ✓"; }
+        catch { if (est) est.textContent = "No se guardó"; }
+      }, 800);
+      return;
+    }
+    if (e.target.id === "buscar") {
+      clearTimeout(tBuscar);
+      st.qTexto = e.target.value;
+      tBuscar = setTimeout(() => { st.q = norm(e.target.value); pintarLista(); }, 180);
+    }
   });
   let tBuscar;
-  $("#buscar").addEventListener("input", (e) => {
-    clearTimeout(tBuscar);
-    tBuscar = setTimeout(() => { st.q = norm(e.target.value); pintarLista(); }, 180);
-  });
   window.addEventListener("hashchange", ruta);
   window.addEventListener("popstate", ruta);
-  $("#tam-mas").addEventListener("click", () => { aviso(`Letra al ${Math.round(escala(.1) * 100)} %`); requestAnimationFrame(medirBarra); });
-  $("#tam-menos").addEventListener("click", () => { aviso(`Letra al ${Math.round(escala(-.1) * 100)} %`); requestAnimationFrame(medirBarra); });
-  $("#btn-como").addEventListener("click", () => $("#dlg-como").showModal());
-  $("#btn-como-movil").addEventListener("click", () => $("#dlg-como").showModal());
-  // Tocar fuera de una ventana la cierra
+  $("#tam-mas").addEventListener("click", () => aviso(`Letra al ${Math.round(escala(.1) * 100)} %`));
+  $("#tam-menos").addEventListener("click", () => aviso(`Letra al ${Math.round(escala(-.1) * 100)} %`));
   $$("dialog").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
-  // La barra de filtros se pega justo debajo de la barra de arriba, mida lo que mida
-  function medirBarra() { document.documentElement.style.setProperty("--barra", `${Math.round($(".barra").getBoundingClientRect().height)}px`); }
-  medirBarra(); window.addEventListener("resize", medirBarra);
   $("#btn-salir").addEventListener("click", async () => {
     ponerLlave("");
     try { await fetch(API + "/api/salir", { method: "POST" }); } catch { /* sin conexión */ }
     location.replace(ENTRADA);
   });
-  $("#btn-agregar").addEventListener("click", () => $("#archivo").click());
   $("#archivo").addEventListener("change", (e) => { if (e.target.files.length) importar([...e.target.files]); e.target.value = ""; });
-  $("#btn-bitacora").addEventListener("click", async () => {
-    const d = await api("/api/bitacora");
-    $("#bitacora-lista").innerHTML = `<table>${d.bitacora.map((b) => `<tr><td>${esc(nombreDe(b.quien))}</td><td>${esc(b.accion)}</td><td>${new Date(b.cuando).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</td><td>${esc(b.accion === "entró" ? b.detalle : "")}</td></tr>`).join("") || "<tr><td>Sin registros</td></tr>"}</table>`;
-    $("#dlg-bitacora").showModal();
-  });
 
+  st.vista = guardado("talento-vista", "tarjetas");
+  st.puesto = guardado("talento-puesto", "domestica");
   escala(0);
+
+  // RLR · lo que usan las otras pantallas (pantallas.js)
+  window.Talento = { st, $, $$, esc, fecha, hace, dias, tel, primer, iniciales, api, aviso, guardarMarca, abrir, repintar, anchos, waBoton, marcasHTML, veredicto, medidores,
+    P, PC, selectorPuestos, usarPuesto, ETAPAS, ETAPA_NOMBRE, ESTADOS, opcionMensaje, textoMensaje, editarMensaje, importar, evaluar, sincronizar, nombreDe, cargar, ir,
+    marcaDe, etapaDe, etapaPastilla, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
   cargar().catch(() => {});
 })();
 /* fin · RLR · Ricardo López Reyero */
