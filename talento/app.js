@@ -1063,8 +1063,9 @@
               <div class="cv-marca">Reclutamiento Talento · Torreón</div>
               <div class="cv-hola">Hola, ${esc(v.primer)} 👋</div>
               <textarea id="son-intro" class="cv-intro" rows="3" maxlength="1200" aria-label="Texto del correo">${esc(v.textos.intro)}</textarea>
+              <div class="cv-condiciones"><div class="cv-marca">En qué aplicaste</div><textarea id="son-condiciones" class="cv-intro" rows="3" maxlength="600" aria-label="En qué aplicó">${esc(v.textos.condiciones || "")}</textarea>${v.sinSueldo ? `<small class="cv-aviso">Este puesto no tiene sueldo escrito. Ponlo aquí para filtrar, o guárdalo en <button type="button" class="liga" data-ir="puestos">Puestos</button> para que salga siempre.</small>` : ""}</div>
               <div class="cv-pregunta">${esc(v.pregunta)}</div>
-              <div class="cv-botones"><span class="btn btn-verde">Sí, estoy abierta</span><span class="btn btn-contorno">Por ahora no</span></div>
+              <div class="cv-botones"><span class="btn btn-verde">Sí, estoy abierta a negociar</span><span class="btn btn-contorno">Por ahora no</span></div>
               <div class="cv-cierre">${esc(v.cierre)}</div>
               <div class="cv-pie">${esc(v.pie)}</div>
             </div>
@@ -1082,7 +1083,7 @@
       <div class="dlg-pie">${st.yo.admin ? `<button class="btn btn-fantasma" id="btn-sondeo-prueba">Mandarme una prueba</button>` : ""}<button class="btn btn-fantasma" data-cerrar>Cancelar</button><button class="btn btn-verde" id="btn-sondeo-enviar" ${v.correoValido ? "" : "disabled"}>${ICONO_PREG}Enviar a ${esc(v.primer)}</button></div>`;
   }
   function textosDelModal() {
-    return { asunto: $("#son-asunto").value.trim(), intro: $("#son-intro").value.trim(), sms: $("#son-sms").value.trim() };
+    return { asunto: $("#son-asunto").value.trim(), intro: $("#son-intro").value.trim(), condiciones: $("#son-condiciones").value.trim(), sms: $("#son-sms").value.trim() };
   }
   async function enviarSondeo(prueba) {
     if (!sondeoActual) return;

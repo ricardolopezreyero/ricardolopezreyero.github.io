@@ -235,7 +235,7 @@
     const a = l.filter((c) => c.nivel === "A").length, proceso = l.filter((c) => ["contactada", "entrevista", "prueba"].includes(etapaDe(c))).length, contr = l.filter((c) => etapaDe(c) === "contratada").length;
     return `<article class="puesto-card ${p.activo === 0 ? "inactivo" : ""}">
       <h3>${esc(p.nombre)} <span class="insignia">${esc(p.prefijo || "")}</span>${p.activo === 0 ? `<span class="insignia aviso">Pausado</span>` : ""}${p.enCodigo ? "" : `<span class="insignia">Creado en el tablero</span>`}</h3>
-      <p class="pc-desc">${esc(p.descripcion || "")}</p>
+      <p class="pc-desc">${esc(p.descripcion || "")}${p.sueldo ? ` <b>${esc(p.sueldo)}.</b>` : ""}</p>
       ${(st.etiquetas || []).some((e) => e.puesto === p.id) ? `<div class="insignias">${(st.etiquetas || []).filter((e) => e.puesto === p.id).map((e) => { const c = st.porId[e.id]; return c ? `<span class="etq etq-${e.etiqueta} chica" title="${esc(e.motivo || "")}">${e.etiqueta === "lista" ? "🧠" : "💛"} ${e.orden || 1} · ${esc(T.primer(c.nombre))}</span>` : ""; }).join("")}</div>` : (l.length >= 100 ? "" : `<small class="quien">Las etiquetas «más lista» y «más empática» aparecen a partir de 100 candidatas.</small>`)}
       ${comoLoDecidieron(p)}
       <div class="pc-cifras"><span><b>${l.length}</b>candidatas</span><span><b>${a}</b>para llamar</span><span><b>${proceso}</b>en proceso</span><span><b>${contr}</b>contratadas</span></div>
@@ -268,7 +268,8 @@
         <div class="campo"><label>Prefijo del contacto</label><input name="prefijo" maxlength="3" value="${p ? esc(p.prefijo) : ""}" placeholder="CH"><small>Se antepone al nombre al guardar el contacto.</small></div>
         <div class="campo"><label>Orden</label><input name="orden" type="number" min="1" max="99" value="${p ? p.orden : st.puestos.length + 1}"></div>
       </div>
-      <div class="campo"><label>El arreglo, en una o dos frases</label><textarea name="descripcion" rows="2" maxlength="600" class="entrada-texto">${p ? esc(p.descripcion) : ""}</textarea></div>
+      <div class="campo"><label>El arreglo, en una o dos frases (horario y qué se ofrece)</label><textarea name="descripcion" rows="2" maxlength="600" class="entrada-texto">${p ? esc(p.descripcion) : ""}</textarea></div>
+      <div class="campo"><label>Sueldo o mínimo para filtrar (se le recuerda a la candidata en el sondeo)</label><input name="sueldo" maxlength="120" value="${p ? esc(p.sueldo || "") : ""}" placeholder="Ej. $1,900 MXN a la semana + IMSS"></div>
       <div class="campo"><label>Formulario del CRM</label>
         <div class="campos-fila"><input name="formulario_id" maxlength="40" value="${forms[0] ? esc(forms[0].id) : ""}" placeholder="Id del formulario (está en la liga link.superleads.mx/widget/form/…)" ${p && p.enCodigo ? "readonly" : ""}><button type="button" class="btn btn-contorno btn-chico" id="btn-leer-form" ${p && p.enCodigo ? "disabled" : ""}>Leer sus preguntas</button></div>
         <small>${forms.length > 1 ? `Este puesto lee ${forms.length} formularios: ${forms.map((f) => esc(f.nombre)).join(" · ")}.` : "Al leerlo se proponen las preguntas; ajusta la clave corta de cada una si quieres."}</small></div>
@@ -301,7 +302,7 @@
     const formId = f.formulario_id.value.trim();
     const cuerpo = {
       id, nombre: f.nombre.value.trim(), corto: f.corto.value.trim(), prefijo: f.prefijo.value.trim(), orden: Number(f.orden.value) || undefined,
-      descripcion: f.descripcion.value.trim(), activo: f.activo ? f.activo.checked : undefined,
+      descripcion: f.descripcion.value.trim(), sueldo: f.sueldo.value.trim(), activo: f.activo ? f.activo.checked : undefined,
       formularios: prev && prev.enCodigo ? prev.formularios : (formId ? [{ id: formId, nombre: f.dataset.formNombre || (prev && prev.formularios[0] && prev.formularios[0].id === formId ? prev.formularios[0].nombre : f.nombre.value.trim()) }] : []),
       preguntas: $$(".preg-fila", f).map((r) => ({ id: r.dataset.id, etiqueta: r.querySelector(".etq").title, clave: r.querySelector("[data-clave]").value.trim(), corta: r.querySelector("[data-corta]").value.trim() })),
       rubrica: { medidores: [0, 1, 2, 3, 4].map((i) => [f[`med_n_${i}`].value.trim(), "", Number(f[`med_m_${i}`].value)]), contexto: f.contexto.value.trim(), exp_auto: f.exp_auto.checked },
