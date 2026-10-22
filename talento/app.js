@@ -195,6 +195,7 @@
     st.marcas = d.marcas || {}; st.eventos = d.eventos || []; st.sincronizaciones = d.sincronizaciones || []; st.crm = d.crm || null;
     st.etiquetas = d.etiquetas || [];
     st.sondeos = d.sondeos || [];
+    st.deliberaciones = d.deliberaciones || [];
     st.puestos = (d.puestos || []).filter((p) => p.activo !== 0 || st.yo.admin);
     st.porPuesto = Object.fromEntries((d.puestos || []).map((p) => [p.id, p]));
     for (const p of st.puestos) st.comparar[p.id] = st.comparar[p.id] || [];
@@ -1128,8 +1129,8 @@
     if (t.id === "btn-agregar") { $("#archivo").click(); return; }
     if (t.id === "btn-sync") { sincronizar(); return; }
     if (t.id === "btn-etiquetas") {
-      aviso("DeepSeek está leyendo todas las solicitudes… puede tardar un minuto", 60000);
-      api("/api/etiquetas", {}).then(async (r) => { const con = r.puestos.filter((x) => x.etiquetas && x.etiquetas.length); aviso(`Etiquetas listas en ${con.length} puesto(s)${r.puestos.filter((x) => x.error).length ? " · alguno falló" : ""}`, 6000); await cargar(); }).catch(() => aviso("No se pudieron calcular las etiquetas"));
+      aviso("DeepSeek y Claude están leyendo todo el lote y debatiendo… puede tardar varios minutos", 300000);
+      api("/api/etiquetas", {}).then(async (r) => { const con = r.puestos.filter((x) => x.etiquetas && x.etiquetas.length); aviso(`El comité deliberó en ${con.length} puesto(s)${r.puestos.filter((x) => x.error).length ? " · alguno falló" : ""}`, 6000); await cargar(); }).catch(() => aviso("El comité no pudo deliberar"));
       return;
     }
     if (t.id === "abrir-menu") { const ab = $("#app").classList.toggle("menu-abierto"); t.setAttribute("aria-expanded", ab); return; }

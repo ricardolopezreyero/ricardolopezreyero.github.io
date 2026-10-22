@@ -684,3 +684,7 @@ body.compartida { background: var(--blue-soft); }
 .sondeo-caja b { font-size: .72rem; letter-spacing: 1.1px; text-transform: uppercase; color: var(--blue); }
 .sondeo-caja p { font-size: .84rem; color: var(--muted); line-height: 1.55; }
 .sondeo-caja .quien { white-space: normal; }
+.delib { font-size: .82rem; }
+.delib summary { cursor: pointer; color: var(--blue); font-weight: 700; }
+.delib ol { margin: 8px 0; padding-left: 18px; display: grid; gap: 6px; }
+.delib .quien { white-space: normal; }

@@ -224,7 +224,7 @@
     const ultimaSync = st.sincronizaciones[0];
     v.innerHTML = `
       <section class="cab"><div><div class="eyebrow">La casa</div><h1>Puestos</h1><p class="sub">Cada vacante con su formulario del CRM y su rúbrica. Hoy ${st.puestos.filter((p) => p.activo !== 0).length} puestos; mañana los que hagan falta.</p></div>
-        <div class="cab-acciones">${admin ? `<button class="btn btn-contorno btn-chico" id="btn-sync" title="Trae lo nuevo de todos los formularios">↻ Traer del CRM</button><button class="btn btn-contorno btn-chico" id="btn-agregar">Agregar CSV</button><button class="btn btn-contorno btn-chico" id="btn-etiquetas" title="Las dos más listas y las dos más empáticas de cada puesto con 100 candidatas o más">🧠 Recalcular etiquetas</button><button class="btn btn-navy btn-chico" id="btn-nuevo-puesto">+ Nuevo puesto</button>` : ""}</div></section>
+        <div class="cab-acciones">${admin ? `<button class="btn btn-contorno btn-chico" id="btn-sync" title="Trae lo nuevo de todos los formularios">↻ Traer del CRM</button><button class="btn btn-contorno btn-chico" id="btn-agregar">Agregar CSV</button><button class="btn btn-contorno btn-chico" id="btn-etiquetas" title="DeepSeek y Claude vuelven a leer todo el lote y debaten quién es la más lista 1 y 2 y la más empática 1 y 2 (puede tardar varios minutos)">🧠 Volver a deliberar etiquetas</button><button class="btn btn-navy btn-chico" id="btn-nuevo-puesto">+ Nuevo puesto</button>` : ""}</div></section>
       ${admin ? (st.crm && st.crm.llave ? `<div class="ok-caja">Conectado al CRM de la subcuenta Talento. ${ultimaSync ? `Última sincronización: ${fecha(ultimaSync.cuando)} · ${ultimaSync.nuevas ?? 0} nuevas.` : "Todavía no se ha sincronizado."} Se trae lo nuevo cada mañana a las 6:33.</div>` : `<div class="aviso-caja"><b>Falta la llave del CRM de la subcuenta Talento.</b> La llave de SuperLeads no alcanza para esa subcuenta. Pasos: en el CRM, en la subcuenta «Talento | Ricardo», entra a Configuración → Integraciones privadas → Crear, con permisos de lectura de formularios y contactos. Copia la llave y en la Mac corre <code>cd ~/Desktop/HTML/Talento && npx wrangler secret put GHL_TALENTO_API_KEY</code>. Mientras, «Agregar CSV» sigue funcionando con el export de Envíos.</div>`) : ""}
       <div class="puestos-lista">${st.puestos.map(tarjetaPuesto).join("")}</div>
       <div id="editor-puesto"></div>
@@ -237,10 +237,23 @@
       <h3>${esc(p.nombre)} <span class="insignia">${esc(p.prefijo || "")}</span>${p.activo === 0 ? `<span class="insignia aviso">Pausado</span>` : ""}${p.enCodigo ? "" : `<span class="insignia">Creado en el tablero</span>`}</h3>
       <p class="pc-desc">${esc(p.descripcion || "")}</p>
       ${(st.etiquetas || []).some((e) => e.puesto === p.id) ? `<div class="insignias">${(st.etiquetas || []).filter((e) => e.puesto === p.id).map((e) => { const c = st.porId[e.id]; return c ? `<span class="etq etq-${e.etiqueta} chica" title="${esc(e.motivo || "")}">${e.etiqueta === "lista" ? "🧠" : "💛"} ${e.orden || 1} · ${esc(T.primer(c.nombre))}</span>` : ""; }).join("")}</div>` : (l.length >= 100 ? "" : `<small class="quien">Las etiquetas «más lista» y «más empática» aparecen a partir de 100 candidatas.</small>`)}
+      ${comoLoDecidieron(p)}
       <div class="pc-cifras"><span><b>${l.length}</b>candidatas</span><span><b>${a}</b>para llamar</span><span><b>${proceso}</b>en proceso</span><span><b>${contr}</b>contratadas</span></div>
       <div class="pc-forms">${(p.formularios || []).map((f) => `<a href="https://link.superleads.mx/widget/form/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.nombre || f.id)} ↗</a>`).join("") || `<span class="quien">Sin formulario ligado</span>`}</div>
       <div class="pc-acciones"><button class="btn btn-navy btn-chico" data-ver-puesto="${p.id}">Ver candidatas</button>${st.yo.admin ? `<button class="btn btn-contorno btn-chico" data-editar-puesto="${p.id}">Editar</button><button class="btn btn-fantasma btn-chico" data-sync-puesto="${p.id}">↻ Traer</button>` : ""}</div>
     </article>`;
+  }
+  // RLR · el debate entre DeepSeek y Claude que decidió las etiquetas del puesto
+  function comoLoDecidieron(p) {
+    const d = (st.deliberaciones || []).find((x) => x.puesto === p.id);
+    if (!d) return "";
+    const nom = (id) => (st.porId[id] || { nombre: id }).nombre;
+    const pos = (r) => r.error ? `<i>falló: ${esc(r.error)}</i>` : `listas: ${esc(nom(r.listas[0].id))} y ${esc(nom(r.listas[1].id))} · empáticas: ${esc(nom(r.empaticas[0].id))} y ${esc(nom(r.empaticas[1].id))}${r.nota ? `<br><span class="quien">${esc(r.nota)}</span>` : ""}`;
+    const COMO = { acuerdo: "Coincidieron a la primera", reconsideracion: "Se pusieron de acuerdo tras leerse", conteo: "No coincidieron del todo: se sumaron sus votos", "un-solo-motor": "Solo pudo opinar una de las dos" };
+    return `<details class="delib"><summary>🧠💛 Cómo lo decidieron DeepSeek y Claude · ${esc(COMO[d.resultado.como] || d.resultado.como)} · ${fecha(d.cuando)}</summary>
+      <p class="g-sub">Leyeron las ${d.leidas} solicitudes del puesto, cada uno por su lado.</p>
+      <ol>${d.rondas.map((r) => `<li><b>Ronda ${r.ronda} · ${r.motor === "deepseek" ? "DeepSeek" : "Claude"}:</b> ${pos(r)}</li>`).join("")}</ol>
+      <p class="g-sub"><b>Conclusión:</b> ${esc(d.acuerdo || "")}</p></details>`;
   }
   function editorPuesto(p) {
     const nuevo = !p;
@@ -336,7 +349,7 @@
   function como(v) {
     v.innerHTML = `
       <section class="cab"><div><div class="eyebrow">La casa</div><h1>Cómo las ordené</h1><p class="sub">Cada puesto tiene su rúbrica. Las primeras las revisé una por una; las que llegan después las califica Claude con la misma rúbrica, calibrada con esas.</p></div></section>
-      <section class="grafica criterio-etq"><h3>Más lista y más empática</h3><p class="g-sub">Aparte del puntaje, a TODAS las candidatas se les califica con el mismo criterio dos cosas de 0 a 10, leyendo solo lo que escribieron. Las dos con mayor listeza y las dos con mayor empatía de cada puesto llevan la etiqueta 1 y 2 (empate: mayor puntaje general, luego la que llegó antes). Solo en puestos con 100 candidatas o más; cuando llega una nueva, se califica y, si supera, toma el lugar.</p>
+      <section class="grafica criterio-etq"><h3>Más lista y más empática</h3><p class="g-sub">Aparte del puntaje, a TODAS las candidatas se les califica con el mismo criterio dos cosas de 0 a 10, leyendo solo lo que escribieron. Con eso a la vista, <b>dos inteligencias, DeepSeek y Claude, leen el lote completo del puesto y debaten</b> quién es la más lista 1 y 2 y la más empática 1 y 2: cada una propone, si no coinciden leen los motivos de la otra y reconsideran, y si aún difieren se suman sus votos. Solo en puestos con 100 candidatas o más; cuando llega una candidata nueva, se califica y el comité vuelve a deliberar. En Puestos se puede leer cómo lo decidieron.</p>
         <table class="tabla-como"><tr><th>Listeza (inteligencia práctica)</th><th>Empatía (calidez real)</th></tr>
           <tr><td><b>0 a 3.</b> No entiende lo que se le pregunta o contesta con una palabra.</td><td><b>0 a 3.</b> Solo habla de tareas o de sí misma; no aparece nadie más.</td></tr>
           <tr><td><b>4 a 6.</b> Contesta lo que se pide, con algún detalle, sin explicar el porqué.</td><td><b>4 a 6.</b> Menciona a la familia o a la niña, con amabilidad general.</td></tr>
