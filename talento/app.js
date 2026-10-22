@@ -112,6 +112,7 @@
 
   function insignias(c) {
     const out = [];
+    out.push(etiquetasHTML(c));
     out.push(`<span class="insignia fuerte">${esc(PC(c).corto || PC(c).nombre)}</span>`);
     if (c.edad) out.push(`<span class="insignia">${c.edad} años</span>`);
     if (c.experiencia && c.experiencia.length < 30) out.push(`<span class="insignia">${esc(c.experiencia)}${/año/.test(c.experiencia) ? "" : " de experiencia"}</span>`);
@@ -120,6 +121,12 @@
     return out.join("");
   }
 
+  // RLR · etiquetas de la casa: «Más lista» y «Más empática», dos por categoría y por puesto (solo con 100 o más candidatas)
+  const ETQ = { lista: ["Más lista", "🧠"], empatica: ["Más empática", "💛"] };
+  const etiquetasDe = (c) => (st.etiquetas || []).filter((e) => e.id === c.id && e.puesto === c.puesto);
+  function etiquetasHTML(c, chicas = false) {
+    return etiquetasDe(c).map((e) => `<span class="etq etq-${e.etiqueta} ${chicas ? "chica" : ""}" title="${esc(e.motivo || "")}">${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]}</span>`).join("");
+  }
   const marcaDe = (c) => st.marcas[c.id] || {};
   const etapaDe = (c) => marcaDe(c).estado || "";
   const esContratada = (c) => etapaDe(c) === "contratada";
@@ -172,6 +179,7 @@
     const d = await api("/api/candidatas");
     st.yo = d.yo; st.nombres = d.nombres || {}; st.ocupadas = new Set(d.ocupadas || []); st.mensajes = d.mensajes || [];
     st.marcas = d.marcas || {}; st.eventos = d.eventos || []; st.sincronizaciones = d.sincronizaciones || []; st.crm = d.crm || null;
+    st.etiquetas = d.etiquetas || [];
     st.puestos = (d.puestos || []).filter((p) => p.activo !== 0 || st.yo.admin);
     st.porPuesto = Object.fromEntries((d.puestos || []).map((p) => [p.id, p]));
     for (const p of st.puestos) st.comparar[p.id] = st.comparar[p.id] || [];
@@ -247,6 +255,7 @@
         <div class="ficha-lugar"><b>${i + 1}</b><span>${LUGARES[i]} opción · ${c.puntos} puntos</span></div>
         <div>
           <h2>${esc(c.nombre)}</h2>
+          ${etiquetasDe(c).length ? `<div class="insignias">${etiquetasHTML(c)}</div>` : ""}
           <div class="ficha-meta">${[c.edad ? `${c.edad} años` : "", esc(c.colonia), c.experiencia && c.experiencia.length < 30 ? esc(c.experiencia) : ""].filter(Boolean).join(" · ")}</div>
         </div>
         <div class="ficha-tel tab">${tel(c.celular)}<small>Celular y WhatsApp${c.tel_extra ? ` · otro: ${tel(c.tel_extra)}` : ""}</small></div>
@@ -271,6 +280,7 @@
     const m = marcaDe(c);
     const f = st.filtro;
     if (f === "favorita") { if (!m.favorita) return false; }
+    else if (f === "lista" || f === "empatica") { if (!etiquetasDe(c).some((e) => e.etiqueta === f)) return false; }
     else if (f === "nueva") { if (m.estado) return false; }
     else if (["contactada", "entrevista", "prueba", "contratada", "descartada"].includes(f)) { if (m.estado !== f) return false; }
     else if (f === "repetidas") { if (!(c.envios > 1)) return false; }
@@ -318,7 +328,7 @@
     const m = marcaDe(c);
     return `<tr class="fila ${m.estado === "descartada" ? "apagada" : ""}" data-id="${c.id}" tabindex="0">
       <td class="derecha tab">${c.lugar ?? "—"}</td>
-      <td class="nombre-celda">${m.favorita ? "★ " : ""}${esc(c.nombre)}</td>
+      <td class="nombre-celda">${m.favorita ? "★ " : ""}${esc(c.nombre)} ${etiquetasHTML(c, true)}</td>
       <td class="derecha tab"><b>${c.puntos ?? "—"}</b></td>
       <td><span class="veredicto v-${c.nivel}">${veredicto(c).corto}</span></td>
       <td>${etapaPastilla(c) || `<span class="etapa-pastilla">Nueva</span>`}</td>
@@ -360,7 +370,7 @@
 
   function pintarChips() {
     const n = (f) => st.lista.filter((c) => { const g = st.filtro; st.filtro = f; const ok = pasaFiltro(c); st.filtro = g; return ok; }).length;
-    const ch = [["todas", "Todas"], ["favorita", "★ Me gusta"], ["nueva", "Sin contactar"], ["contactada", "Contactadas"], ["entrevista", "Entrevista"], ["prueba", "Prueba"], ["contratada", "Contratadas"], ["descartada", "Descartadas"], ["repetidas", "Llenaron más de una vez"], ["recientes", "Recientes"]];
+    const ch = [["todas", "Todas"], ["favorita", "★ Me gusta"], ["lista", "🧠 Más listas"], ["empatica", "💛 Más empáticas"], ["nueva", "Sin contactar"], ["contactada", "Contactadas"], ["entrevista", "Entrevista"], ["prueba", "Prueba"], ["contratada", "Contratadas"], ["descartada", "Descartadas"], ["repetidas", "Llenaron más de una vez"], ["recientes", "Recientes"]];
     $("#chips-estado").innerHTML = ch.map(([k, t]) => { const c = k === "todas" ? 0 : n(k); return (k === "todas" || c) ? `<button class="chip ${st.filtro === k ? "activo" : ""}" data-filtro="${k}">${t}${c ? ` · ${c}` : ""}</button>` : ""; }).join("");
   }
 
@@ -726,7 +736,7 @@
       </div>
       <div class="fc-top">
         <div>
-          <div class="fc-lugar"><span class="num">${c.lugar ? `Lugar #${c.lugar}` : "Nueva"}</span><span class="veredicto v-${c.nivel}">${v.largo}</span><span class="insignia fuerte">${esc(p.nombre)}</span>${etapaPastilla(c)}</div>
+          <div class="fc-lugar"><span class="num">${c.lugar ? `Lugar #${c.lugar}` : "Nueva"}</span><span class="veredicto v-${c.nivel}">${v.largo}</span><span class="insignia fuerte">${esc(p.nombre)}</span>${etapaPastilla(c)}${etiquetasHTML(c)}</div>
           <h1 id="fc-nombre">${esc(c.nombre)}</h1>
           <div class="fc-meta">
             ${c.edad ? `<span>${c.edad} años</span>` : ""}
@@ -760,6 +770,7 @@
             <div class="caja caja-ojo"><h3>Lo que hay que confirmar</h3><p>${esc(c.a_cuidar || "—")}</p></div>
           </div>
           ${c.preguntar ? `<div class="pregunta">${ICONO_PREG}<div><b>Pregunta para la primera llamada</b><p>${esc(c.preguntar)}</p></div></div>` : ""}
+          ${etiquetasDe(c).map((e) => `<div class="etq-caja etq-${e.etiqueta}"><b>${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} de ${esc(p.nombre.toLowerCase())}</b><p>${esc(e.motivo || "")}</p></div>`).join("")}
         </section>
 
         <section class="panel">
@@ -809,7 +820,7 @@
             <div class="dato"><span>Colonia</span>${esc(c.colonia || "—")}</div>
             <div class="dato"><span>Referida por</span>${esc(c.referido || "—")}</div>
             <div class="dato"><span>Formulario</span>${esc(nombreFormulario(c))}</div>
-            <div class="dato"><span>Evaluación</span>${c.evaluo === "claude-auto" ? "Automática con Claude" : c.evaluo === "claude-revision" ? "Revisada una por una" : c.evaluo === "error" ? "Falló, se reintenta" : "Pendiente"}</div>
+            <div class="dato"><span>Evaluación</span>${c.evaluo === "deepseek-auto" ? "Automática con DeepSeek" : c.evaluo === "claude-auto" ? "Automática con Claude" : c.evaluo === "claude-revision" ? "Revisada una por una" : c.evaluo === "error" ? "Falló, se reintenta" : "Pendiente"}</div>
           </div>
         </section>
       </aside>
@@ -965,7 +976,7 @@
       let r = await api("/api/evaluar", { reintentar });
       let hechas = 0;
       while (r.evaluada) {
-        hechas++; aviso(`Claude evaluó a ${r.nombre}${r.ok ? "" : ` (falló: ${r.error})`} · quedan ${r.quedan}`, 6000);
+        hechas++; aviso(`${r.motor === "deepseek-auto" ? "DeepSeek" : "Claude"} evaluó a ${r.nombre}${r.ok ? "" : ` (falló: ${r.error})`} · quedan ${r.quedan}`, 6000);
         if (!r.quedan) break;
         r = await api("/api/evaluar", {});
       }
@@ -1079,6 +1090,11 @@
     if (t.id === "btn-evaluar") { evaluar(true); return; }
     if (t.id === "btn-agregar") { $("#archivo").click(); return; }
     if (t.id === "btn-sync") { sincronizar(); return; }
+    if (t.id === "btn-etiquetas") {
+      aviso("DeepSeek está leyendo todas las solicitudes… puede tardar un minuto", 60000);
+      api("/api/etiquetas", {}).then(async (r) => { const con = r.puestos.filter((x) => x.etiquetas && x.etiquetas.length); aviso(`Etiquetas listas en ${con.length} puesto(s)${r.puestos.filter((x) => x.error).length ? " · alguno falló" : ""}`, 6000); await cargar(); }).catch(() => aviso("No se pudieron calcular las etiquetas"));
+      return;
+    }
     if (t.id === "abrir-menu") { const ab = $("#app").classList.toggle("menu-abierto"); t.setAttribute("aria-expanded", ab); return; }
     if (t.closest("[data-cerrar]")) { t.closest("dialog").close(); }
   });
@@ -1123,7 +1139,7 @@
   // RLR · lo que usan las otras pantallas (pantallas.js)
   window.Talento = { st, $, $$, esc, fecha, hace, dias, tel, primer, iniciales, api, aviso, guardarMarca, abrir, repintar, anchos, waBoton, marcasHTML, veredicto, medidores,
     P, PC, selectorPuestos, usarPuesto, ETAPAS, ETAPA_NOMBRE, ESTADOS, opcionMensaje, textoMensaje, editarMensaje, importar, evaluar, sincronizar, nombreDe, cargar, ir,
-    marcaDe, etapaDe, etapaPastilla, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
+    marcaDe, etapaDe, etapaPastilla, etiquetasHTML, etiquetasDe, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
   cargar().catch(() => {});
 })();
 /* fin · RLR · Ricardo López Reyero */
