@@ -127,6 +127,20 @@
   function etiquetasHTML(c, chicas = false) {
     return etiquetasDe(c).map((e) => `<span class="etq etq-${e.etiqueta} ${chicas ? "chica" : ""}" title="${esc(e.motivo || "")}">${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} ${e.orden || 1}</span>`).join("");
   }
+  // RLR · sondeo de disponibilidad: un clic y la candidata recibe un correo con dos botones; la secuencia se repite hasta que conteste
+  const sondeoDe = (c) => { const l = (st.sondeos || []).filter((x) => x.id === c.id); return l[l.length - 1] || null; };
+  const correoValido = (x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x || "") && !/notengo|no tengo|sin correo/i.test(x);
+  function sondeoHTML(c, largo = false) {
+    const s = sondeoDe(c);
+    if (s && s.respuesta) return `<span class="sondeo-pill ${s.respuesta === "si" ? "si" : "no"}" title="Contestó el ${fecha(s.respondido)} por ${s.canal === "sms" ? "SMS" : "correo"}">${s.respuesta === "si" ? "💚 Dijo que sí está abierta" : "🙏 Dijo que por ahora no"}${largo ? ` · ${fecha(s.respondido)}` : ""}</span>${largo && s.respuesta === "si" ? `<small class="quien">Le prometimos que le escribirías por WhatsApp.</small>` : ""}`;
+    if (s && s.siguiente) {
+      const sig = Math.max(0, Math.round((new Date(s.siguiente) - Date.now()) / 3600000));
+      return `<span class="sondeo-pill espera" title="Toques enviados: ${s.paso} de 4">✉ Preguntada ${hace(s.creado)} · ${s.paso < 4 ? `aviso ${s.paso + 1} en ${sig} h` : "último aviso enviado"}</span>${largo ? `<small class="quien">${s.envios.map((e) => `${e.canal === "sms" ? "SMS" : "Correo"} ${e.paso}${e.error ? ` falló (${esc(e.error)})` : " ✓"}`).join(" · ")}</small>` : ""}`;
+    }
+    if (s) return `<span class="sondeo-pill no">Sin respuesta tras 4 avisos</span>${largo ? `<button type="button" class="btn btn-contorno btn-chico" data-sondeo="${c.id}">Volver a preguntar</button>` : ""}`;
+    if (!correoValido(c.correo)) return largo ? `<small class="quien">No dejó correo: por ahora el sondeo solo va por correo.</small>` : "";
+    return `<button type="button" class="btn btn-contorno btn-chico" data-sondeo="${c.id}" title="Le llega un correo con dos botones: «Sí, estoy abierta» y «Por ahora no». Si no contesta, se repite a la hora, a las 12 y a las 24.">✉ ¿Está abierta a trabajar?</button>`;
+  }
   const marcaDe = (c) => st.marcas[c.id] || {};
   const etapaDe = (c) => marcaDe(c).estado || "";
   const esContratada = (c) => etapaDe(c) === "contratada";
@@ -180,6 +194,7 @@
     st.yo = d.yo; st.nombres = d.nombres || {}; st.ocupadas = new Set(d.ocupadas || []); st.mensajes = d.mensajes || [];
     st.marcas = d.marcas || {}; st.eventos = d.eventos || []; st.sincronizaciones = d.sincronizaciones || []; st.crm = d.crm || null;
     st.etiquetas = d.etiquetas || [];
+    st.sondeos = d.sondeos || [];
     st.puestos = (d.puestos || []).filter((p) => p.activo !== 0 || st.yo.admin);
     st.porPuesto = Object.fromEntries((d.puestos || []).map((p) => [p.id, p]));
     for (const p of st.puestos) st.comparar[p.id] = st.comparar[p.id] || [];
@@ -266,6 +281,7 @@
         <div><h3>Por qué es la ${LUGARES[i]}</h3><p>${esc(c.resumen)}</p></div>
         ${c.a_favor ? `<div><h3>Lo que la hace brillar</h3><p class="tenue">${esc(c.a_favor)}</p></div>` : ""}
         ${marcasHTML(c)}
+        ${sondeoDe(c) ? `<div>${sondeoHTML(c)}</div>` : ""}
       </article>`).join("") || "";
     $("#podio").classList.toggle("oculto", !tres.length);
   }
@@ -311,6 +327,7 @@
         ${waBoton(c, "btn-navy btn-chico", `${ICONO_WA}WhatsApp`)}
         <a class="btn btn-fantasma btn-chico" href="tel:+52${c.celular}">${ICONO_TEL}${tel(c.celular)}</a>
         ${marcasHTML(c)}
+        ${noDisponible(c) ? "" : sondeoHTML(c)}
         ${botonComparar(c)}
         <span class="t-ver">Ver ficha completa →</span>
       </div>
@@ -802,6 +819,7 @@
           <h2>Decisión de la casa</h2>
           <p class="sub">Lo que marquen aquí lo ve toda su casa.</p>
           ${marcasHTML(c)}
+          ${noDisponible(c) ? "" : `<div class="sondeo-caja"><b>¿Está abierta a un nuevo trabajo?</b><p>Un clic y le llega un correo suave con dos botones; no se dice quién es la familia. Si no contesta, se repite a la hora, a las 12 y a las 24 (la última también por SMS cuando haya proveedor).</p>${sondeoHTML(c, true)}${st.yo.admin ? `<button type="button" class="btn btn-fantasma btn-chico" data-sondeo-prueba="${c.id}">Probar conmigo</button>` : ""}</div>`}
           <div class="nota"><label for="nota-${c.id}">Notas de la llamada</label>
             <textarea id="nota-${c.id}" data-nota="${c.id}" placeholder="Ej. Contestó rápido, puede empezar el lunes…">${esc(m.nota || "")}</textarea>
             <small id="nota-estado-${c.id}">${m.nota && m.cuando ? `Guardado ${fecha(m.cuando)}` : "Se guarda solo"}</small></div>
@@ -1049,6 +1067,24 @@
     const bNo = t.closest("[data-accion='no-contratar']");
     if (bNo) { ev.stopPropagation(); liberar(bNo.closest(".marcas").dataset.id); return; }
     if (t.id === "btn-si-contratar") { contratar(); return; }
+    const bSon = t.closest("[data-sondeo]");
+    if (bSon) {
+      ev.stopPropagation();
+      const id = bSon.dataset.sondeo; const c = st.porId[id];
+      bSon.disabled = true; aviso(`Mandando el correo a ${primer(c.nombre)}…`, 8000);
+      api("/api/sondeo", { id }).then(async () => { aviso(`Listo: ${primer(c.nombre)} ya tiene el correo. Si no contesta, se repite solo.`, 6000); await cargar(); })
+        .catch((e) => { bSon.disabled = false; aviso((e.datos && e.datos.mensaje) || "No se pudo mandar el correo", 6000); });
+      return;
+    }
+    const bSonP = t.closest("[data-sondeo-prueba]");
+    if (bSonP) {
+      ev.stopPropagation();
+      const correo = prompt("¿A qué correo mando la prueba? Llega tal cual lo vería la candidata, con los dos botones.", "ricardo@superleads.mx");
+      if (!correo) return;
+      aviso("Mandando la prueba…", 8000);
+      api("/api/sondeo", { id: bSonP.dataset.sondeoPrueba, prueba: true, correo }).then(() => aviso(`Prueba enviada a ${correo}`, 6000)).catch((e) => aviso((e.datos && e.datos.mensaje) || "No se pudo mandar la prueba", 6000));
+      return;
+    }
     const bFav = t.closest("[data-favorita]");
     if (bFav) {
       ev.stopPropagation();
@@ -1140,7 +1176,7 @@
   // RLR · lo que usan las otras pantallas (pantallas.js)
   window.Talento = { st, $, $$, esc, fecha, hace, dias, tel, primer, iniciales, api, aviso, guardarMarca, abrir, repintar, anchos, waBoton, marcasHTML, veredicto, medidores,
     P, PC, selectorPuestos, usarPuesto, ETAPAS, ETAPA_NOMBRE, ESTADOS, opcionMensaje, textoMensaje, editarMensaje, importar, evaluar, sincronizar, nombreDe, cargar, ir,
-    marcaDe, etapaDe, etapaPastilla, etiquetasHTML, etiquetasDe, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
+    marcaDe, etapaDe, etapaPastilla, etiquetasHTML, etiquetasDe, sondeoHTML, sondeoDe, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
   cargar().catch(() => {});
 })();
 /* fin · RLR · Ricardo López Reyero */

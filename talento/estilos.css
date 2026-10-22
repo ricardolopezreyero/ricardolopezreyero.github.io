@@ -674,3 +674,13 @@ body.compartida { background: var(--blue-soft); }
 .dim b { display: block; font-size: .7rem; letter-spacing: 1.1px; text-transform: uppercase; color: var(--blue); margin-bottom: 2px; }
 .dim p { font-size: .88rem; line-height: 1.55; color: var(--ink); }
 @media (max-width: 600px) { .dimensiones { grid-template-columns: 1fr; } }
+
+/* ─── Sondeo de disponibilidad ─── */
+.sondeo-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 2.25rem; padding: 0 .85rem; border-radius: 9999px; font-size: .78rem; font-weight: 700; white-space: nowrap; background: var(--blue-softer); color: var(--navy); border: .5px solid #c9d7ff; }
+.sondeo-pill.si { background: #e3f7e8; color: #0a7a0a; border-color: #bfe9cb; }
+.sondeo-pill.no { background: #eef0f4; color: var(--muted); border-color: #dfe3ea; }
+.sondeo-pill.espera { background: #fff6d6; color: #8a5a00; border-color: #f0d27a; }
+.sondeo-caja { margin: 0 0 14px; padding: 14px 16px; border-radius: 12px; background: var(--blue-soft); border: .5px solid var(--border); display: grid; gap: 8px; justify-items: start; }
+.sondeo-caja b { font-size: .72rem; letter-spacing: 1.1px; text-transform: uppercase; color: var(--blue); }
+.sondeo-caja p { font-size: .84rem; color: var(--muted); line-height: 1.55; }
+.sondeo-caja .quien { white-space: normal; }
