@@ -718,3 +718,16 @@ body.compartida { background: var(--blue-soft); }
 @keyframes encoger { to { transform: translateY(calc(50vh - 60px)) scale(.08); opacity: 0; border-radius: 9999px; } }
 @keyframes desvanecer { to { opacity: 0; } }
 @media (max-width: 760px) { .sondeo-cols { grid-template-columns: 1fr; } .dlg-sondeo { max-width: none; } }
+
+/* ─── Privacidad: apellidos, teléfonos y correos difuminados ─── */
+body.privado .privado { filter: blur(5px); user-select: none; -webkit-user-select: none; }
+.privacidad { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 10px; border: .5px solid rgba(255,255,255,.14); background: transparent; color: var(--on-dark-2); font-size: .82rem; font-weight: 700; text-align: left; }
+.privacidad svg { width: 18px; height: 18px; flex: none; }
+.privacidad .tachado { display: none; }
+.privacidad[aria-pressed="false"] .tachado { display: block; }
+.privacidad span { flex: 1; }
+.privacidad .riel { width: 34px; height: 20px; border-radius: 999px; background: rgba(255,255,255,.14); position: relative; flex: none; transition: background .25s; }
+.privacidad .riel::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .25s var(--ease); }
+.privacidad[aria-pressed="true"] { color: #fff; border-color: rgba(86,239,159,.4); }
+.privacidad[aria-pressed="true"] .riel { background: var(--green); }
+.privacidad[aria-pressed="true"] .riel::after { transform: translateX(14px); background: var(--navy-deep); }

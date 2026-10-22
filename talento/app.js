@@ -47,6 +47,16 @@
   const primer = (n) => String(n || "").split(" ").find((w) => w.length > 2 && !/^ma\.?$/i.test(w)) || n;
   const iniciales = (n) => String(n || "").split(" ").filter((w) => w.length > 2 && !/\.$/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const guardado = (k, def) => { try { return localStorage.getItem(k) || def; } catch { return def; } };
+  // RLR · privacidad: con el interruptor encendido se difuminan apellidos, teléfonos y correos (quedan primer nombre, colonia y edad)
+  const sens = (t) => `<span class="privado">${esc(t)}</span>`;
+  const priv = (t) => esc(t).replace(/(?:\+?52\s?)?\b\d(?:[\d\s().-]{8,}\d)\b/g, (m) => `<span class="privado">${m}</span>`).replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, (m) => `<span class="privado">${m}</span>`);
+  function nombreHTML(n) {
+    const w = String(n || "").trim().split(/\s+/).filter(Boolean);
+    if (w.length < 2) return esc(n);
+    const p = primer(n); let i = w.indexOf(p); if (i < 0) i = 0;
+    return `${esc(w.slice(0, i + 1).join(" "))} <span class="privado">${esc(w.slice(i + 1).join(" "))}</span>`;
+  }
+  const telHTML = (t) => sens(tel(t));
   const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
 
   /* ─── puestos (vienen del servidor) ─── */
@@ -273,17 +283,17 @@
       <article class="ficha ${noDisponible(c) ? "contratada" : ""}" data-id="${c.id}">
         <div class="ficha-lugar"><b>${i + 1}</b><span>${LUGARES[i]} opción · ${c.puntos} puntos</span></div>
         <div>
-          <h2>${esc(c.nombre)}</h2>
+          <h2>${nombreHTML(c.nombre)}</h2>
           ${etiquetasDe(c).length ? `<div class="insignias">${etiquetasHTML(c)}</div>` : ""}
           <div class="ficha-meta">${[c.edad ? `${c.edad} años` : "", esc(c.colonia), c.experiencia && c.experiencia.length < 30 ? esc(c.experiencia) : ""].filter(Boolean).join(" · ")}</div>
         </div>
-        <div class="ficha-tel tab">${tel(c.celular)}<small>Celular y WhatsApp${c.tel_extra ? ` · otro: ${tel(c.tel_extra)}` : ""}</small></div>
+        <div class="ficha-tel tab">${telHTML(c.celular)}<small>Celular y WhatsApp${c.tel_extra ? ` · otro: ${telHTML(c.tel_extra)}` : ""}</small></div>
         <div class="ficha-acciones">
           ${waBoton(c, "btn-verde", `${ICONO_WA}WhatsApp`)}
           <button class="btn btn-contorno" data-abrir="${c.id}">Ver ficha completa</button>
         </div>
-        <div><h3>Por qué es la ${LUGARES[i]}</h3><p>${esc(c.resumen)}</p></div>
-        ${c.a_favor ? `<div><h3>Lo que la hace brillar</h3><p class="tenue">${esc(c.a_favor)}</p></div>` : ""}
+        <div><h3>Por qué es la ${LUGARES[i]}</h3><p>${priv(c.resumen)}</p></div>
+        ${c.a_favor ? `<div><h3>Lo que la hace brillar</h3><p class="tenue">${priv(c.a_favor)}</p></div>` : ""}
         ${marcasHTML(c)}
         ${noDisponible(c) ? "" : `<div>${sondeoHTML(c)}</div>`}
       </article>`).join("") || "";
@@ -320,16 +330,16 @@
       <div class="t-fila">
         <div class="avatar n${c.nivel}">${esc(iniciales(c.nombre))}${c.lugar ? `<b>${c.lugar}</b>` : ""}</div>
         <div>
-          <div class="t-cab"><h3 class="t-nombre">${esc(c.nombre)}</h3><span class="veredicto v-${c.nivel}">${v.corto}</span>${etapaPastilla(c)}</div>
+          <div class="t-cab"><h3 class="t-nombre">${nombreHTML(c.nombre)}</h3><span class="veredicto v-${c.nivel}">${v.corto}</span>${etapaPastilla(c)}</div>
           <div class="t-meta">${[esc(c.colonia), `Llenó ${fecha(c.ultimo_envio)} · ${hace(c.ultimo_envio)}`].filter(Boolean).join(" · ")}</div>
           <div class="insignias">${insignias(c)}</div>
-          <p class="t-res">${esc(c.resumen || "—")}</p>
+          <p class="t-res">${priv(c.resumen || "—")}</p>
         </div>
         <div class="puntaje"><div class="puntaje-num tab">${c.puntos ?? "—"}<small>/100</small></div>${medidores(c)}</div>
       </div>
       <div class="t-acciones">
         ${waBoton(c, "btn-navy btn-chico", `${ICONO_WA}WhatsApp`)}
-        <a class="btn btn-fantasma btn-chico" href="tel:+52${c.celular}">${ICONO_TEL}${tel(c.celular)}</a>
+        <a class="btn btn-fantasma btn-chico" href="tel:+52${c.celular}">${ICONO_TEL}${telHTML(c.celular)}</a>
         ${marcasHTML(c)}
         ${noDisponible(c) ? "" : sondeoHTML(c)}
         ${botonComparar(c)}
@@ -349,7 +359,7 @@
     const m = marcaDe(c);
     return `<tr class="fila ${m.estado === "descartada" ? "apagada" : ""}" data-id="${c.id}" tabindex="0">
       <td class="derecha tab">${c.lugar ?? "—"}</td>
-      <td class="nombre-celda">${m.favorita ? "★ " : ""}${esc(c.nombre)} ${etiquetasHTML(c, true)}</td>
+      <td class="nombre-celda">${m.favorita ? "★ " : ""}${nombreHTML(c.nombre)} ${etiquetasHTML(c, true)}</td>
       <td class="derecha tab"><b>${c.puntos ?? "—"}</b></td>
       <td><span class="veredicto v-${c.nivel}">${veredicto(c).corto}</span></td>
       <td>${etapaPastilla(c) || `<span class="etapa-pastilla">Nueva</span>`}</td>
@@ -468,20 +478,20 @@
     <div class="cmp-envoltura"><div class="cmp" data-cols="${cs.length}">
       <div class="cmp-fila cmp-cab"><div class="cmp-t"></div>${cs.map((c) => `<div class="cmp-c">
         <div class="cmp-lugar">${c.puntos === mejor ? "👑 " : ""}Lugar #${c.lugar ?? "—"}</div>
-        <h2>${esc(c.nombre)}</h2>
+        <h2>${nombreHTML(c.nombre)}</h2>
         <span class="veredicto v-${c.nivel}">${veredicto(c).corto}</span>
         <div class="cmp-puntos tab">${c.puntos ?? "—"}<small>/100</small></div>
         <div class="cmp-acciones">${waBoton(c, "btn-verde btn-chico", `${ICONO_WA}WhatsApp`)}<button class="btn btn-contorno btn-chico" data-abrir="${c.id}">Ver ficha</button></div>
       </div>`).join("")}</div>
       ${medidoresDe(p).map(([n, k, max]) => med(n, k, max)).join("")}
       ${fila("Datos", (c) => [c.edad ? `${c.edad} años` : "", esc(c.colonia), c.experiencia && c.experiencia.length < 30 ? esc(c.experiencia) : ""].filter(Boolean).join("<br>") || "—")}
-      ${fila("Por qué está aquí", (c) => esc(c.resumen || "—"))}
-      ${fila("Lo que la hace brillar", (c) => esc(c.a_favor || "—"), "bien")}
-      ${fila("Lo que hay que confirmar", (c) => esc(c.a_cuidar || "—"), "ojo")}
-      ${fila("Pregunta para la llamada", (c) => esc(c.preguntar || "—"))}
-      ${citas.map(([k, t]) => fila(esc(t), (c) => `«${esc(ultimoEnvio(c)[k] || "—")}»`)).join("")}
+      ${fila("Por qué está aquí", (c) => priv(c.resumen || "—"))}
+      ${fila("Lo que la hace brillar", (c) => priv(c.a_favor || "—"), "bien")}
+      ${fila("Lo que hay que confirmar", (c) => priv(c.a_cuidar || "—"), "ojo")}
+      ${fila("Pregunta para la llamada", (c) => priv(c.preguntar || "—"))}
+      ${citas.map(([k, t]) => fila(esc(t), (c) => `«${priv(ultimoEnvio(c)[k] || "—")}»`)).join("")}
       ${p.rubrica && p.rubrica.platillos ? fila("Lo que cocina", (c) => esc(ultimoEnvio(c)[p.rubrica.platillos] || "—")) : ""}
-      ${fila("Referida por", (c) => esc(c.referido || "—"))}
+      ${fila("Referida por", (c) => priv(c.referido || "—"))}
       ${fila("Decisión de la casa", (c) => marcasHTML(c), "fila-decision")}
     </div></div>`;
   }
@@ -711,7 +721,7 @@
 
   /* ─── ficha completa ─── */
   function qaLista(c, e) {
-    return `<dl class="qa-lista">${preguntasRespuestas(c, e).map(([p, r]) => `<div class="qa"><dt>${esc(p)}</dt><dd>${esc(r || "—")}</dd></div>`).join("")}</dl>`;
+    return `<dl class="qa-lista">${preguntasRespuestas(c, e).map(([p, r]) => `<div class="qa"><dt>${esc(p)}</dt><dd>${priv(r || "—")}</dd></div>`).join("")}</dl>`;
   }
   function platillos(txt) {
     const partes = String(txt || "").split(/\n|,|;|\/|\s-\s|(?:^|\s)-(?=\S)/).map((s) => s.trim().replace(/^[-–•\s]+|[.\s]+$/g, "")).filter((s) => s.length > 1);
@@ -758,7 +768,7 @@
       <div class="fc-top">
         <div>
           <div class="fc-lugar"><span class="num">${c.lugar ? `Lugar #${c.lugar}` : "Nueva"}</span><span class="veredicto v-${c.nivel}">${v.largo}</span><span class="insignia fuerte">${esc(p.nombre)}</span>${etapaPastilla(c)}${etiquetasHTML(c)}</div>
-          <h1 id="fc-nombre">${esc(c.nombre)}</h1>
+          <h1 id="fc-nombre">${nombreHTML(c.nombre)}</h1>
           <div class="fc-meta">
             ${c.edad ? `<span>${c.edad} años</span>` : ""}
             ${c.colonia ? `<span>${esc(c.colonia)}</span>` : ""}
@@ -766,9 +776,9 @@
             <span>${c.envios > 1 ? `Llenó ${c.envios} veces · última ${fecha(c.ultimo_envio)}` : `Llenó el ${fecha(c.ultimo_envio)}`} · ${hace(c.ultimo_envio)}</span>
           </div>
           <div class="fc-contacto">
-            ${waBoton(c, "btn-verde", `${ICONO_WA}WhatsApp ${tel(c.celular)}`)}
+            ${waBoton(c, "btn-verde", `${ICONO_WA}WhatsApp ${telHTML(c.celular)}`)}
             <a class="btn btn-contorno-claro" href="tel:+52${c.celular}">${ICONO_TEL}Llamar</a>
-            ${c.tel_extra ? `<a class="btn btn-contorno-claro" href="tel:+52${c.tel_extra}">${ICONO_TEL}Otro número ${tel(c.tel_extra)}</a>` : ""}
+            ${c.tel_extra ? `<a class="btn btn-contorno-claro" href="tel:+52${c.tel_extra}">${ICONO_TEL}Otro número ${telHTML(c.tel_extra)}</a>` : ""}
             <button class="btn btn-contorno-claro" data-vcf="${c.id}">⬇ Guardar contacto</button>
             ${botonComparar(c, true)}
           </div>
@@ -785,20 +795,20 @@
         <section class="panel">
           <h2>Nuestra lectura</h2>
           <p class="lectura-veredicto">${v.frase} ${top}</p>
-          <p class="lectura-lead">${esc(c.resumen || "—")}</p>
+          <p class="lectura-lead">${priv(c.resumen || "—")}</p>
           <div class="dos">
-            <div class="caja caja-bien"><h3>Lo que la hace brillar</h3><p>${esc(c.a_favor || "—")}</p></div>
-            <div class="caja caja-ojo"><h3>Lo que hay que confirmar</h3><p>${esc(c.a_cuidar || "—")}</p></div>
+            <div class="caja caja-bien"><h3>Lo que la hace brillar</h3><p>${priv(c.a_favor || "—")}</p></div>
+            <div class="caja caja-ojo"><h3>Lo que hay que confirmar</h3><p>${priv(c.a_cuidar || "—")}</p></div>
           </div>
-          ${c.preguntar ? `<div class="pregunta">${ICONO_PREG}<div><b>Pregunta para la primera llamada</b><p>${esc(c.preguntar)}</p></div></div>` : ""}
-          ${etiquetasDe(c).map((e) => `<div class="etq-caja etq-${e.etiqueta}"><b>${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} ${e.orden || 1} de ${esc(p.nombre.toLowerCase())}</b><p>${esc(e.motivo || "")}</p></div>`).join("")}
+          ${c.preguntar ? `<div class="pregunta">${ICONO_PREG}<div><b>Pregunta para la primera llamada</b><p>${priv(c.preguntar)}</p></div></div>` : ""}
+          ${etiquetasDe(c).map((e) => `<div class="etq-caja etq-${e.etiqueta}"><b>${ETQ[e.etiqueta][1]} ${ETQ[e.etiqueta][0]} ${e.orden || 1} de ${esc(p.nombre.toLowerCase())}</b><p>${priv(e.motivo || "")}</p></div>`).join("")}
           ${c.p_lista != null && c.p_lista >= 0 ? `<div class="dimensiones"><div class="dim"><span class="dim-n tab">${c.p_lista}<small>/10</small></span><div><b>Listeza</b><p>${esc(c.lista_motivo || "")}</p></div></div><div class="dim"><span class="dim-n tab">${c.p_empatia}<small>/10</small></span><div><b>Empatía</b><p>${esc(c.empatia_motivo || "")}</p></div></div></div>` : ""}
         </section>
 
         <section class="panel">
           <h2>En sus palabras</h2>
           <p class="sub">Lo que ella escribió${c.envios > 1 ? (otraSol ? ` en su solicitud del ${fecha(d.fecha)}, la que mejor la representa` : " en su solicitud más reciente") : " en su solicitud"}, tal cual.</p>
-          ${citas.map(([k, t]) => `<div class="cita-titulo">${esc(t)}</div><blockquote class="cita"><p>«${esc(k.startsWith("__") ? ((d.respuestas || []).find((r) => r.p === t) || {}).r : d[k])}»</p></blockquote>`).join("")}
+          ${citas.map(([k, t]) => `<div class="cita-titulo">${esc(t)}</div><blockquote class="cita"><p>«${priv(k.startsWith("__") ? ((d.respuestas || []).find((r) => r.p === t) || {}).r : d[k])}»</p></blockquote>`).join("")}
           ${rub.platillos && d[rub.platillos] ? `<div class="cita-titulo">Lo que cocina muy bien</div>${platillos(d[rub.platillos])}` : ""}
           ${!citas.length && !(rub.platillos && d[rub.platillos]) ? qaLista(c, d) : ""}
           ${cvs(d.cv)}
@@ -836,12 +846,12 @@
         <section class="panel">
           <h2>Datos</h2>
           <div class="datos-lista">
-            <div class="dato"><span>Celular y WhatsApp</span>${noDisponible(c) ? `<span class="apagado">${tel(c.celular)} · contratada</span>` : `<a href="${wa(c)}" target="_blank" rel="noopener">${tel(c.celular)}</a>`}</div>
-            ${c.tel_extra ? `<div class="dato"><span>Otro número</span>${noDisponible(c) ? `<span class="apagado">${tel(c.tel_extra)}</span>` : `<a href="${wa(c, c.tel_extra)}" target="_blank" rel="noopener">${tel(c.tel_extra)}</a>`}</div>` : ""}
-            <div class="dato"><span>Correo</span>${esc(c.correo || "—")}</div>
+            <div class="dato"><span>Celular y WhatsApp</span>${noDisponible(c) ? `<span class="apagado">${telHTML(c.celular)} · contratada</span>` : `<a href="${wa(c)}" target="_blank" rel="noopener">${telHTML(c.celular)}</a>`}</div>
+            ${c.tel_extra ? `<div class="dato"><span>Otro número</span>${noDisponible(c) ? `<span class="apagado">${telHTML(c.tel_extra)}</span>` : `<a href="${wa(c, c.tel_extra)}" target="_blank" rel="noopener">${telHTML(c.tel_extra)}</a>`}</div>` : ""}
+            <div class="dato"><span>Correo</span>${c.correo ? sens(c.correo) : "—"}</div>
             <div class="dato"><span>Edad</span>${c.edad ? `${c.edad} años · nació el ${fecha(c.nacimiento)}` : "No la dio"}</div>
             <div class="dato"><span>Colonia</span>${esc(c.colonia || "—")}</div>
-            <div class="dato"><span>Referida por</span>${esc(c.referido || "—")}</div>
+            <div class="dato"><span>Referida por</span>${priv(c.referido || "—")}</div>
             <div class="dato"><span>Formulario</span>${esc(nombreFormulario(c))}</div>
             <div class="dato"><span>Evaluación</span>${c.evaluo === "deepseek-auto" ? "Automática con DeepSeek" : c.evaluo === "claude-auto" ? "Automática con Claude" : c.evaluo === "claude-revision" ? "Revisada una por una" : c.evaluo === "error" ? "Falló, se reintenta" : "Pendiente"}</div>
           </div>
@@ -1044,7 +1054,7 @@
       <div class="dlg sondeo-modal">
         <div class="eyebrow">Sondeo de disponibilidad</div>
         <h2 id="sondeo-titulo">¿${esc(v.primer)} está abierta a un nuevo trabajo?</h2>
-        <p class="sub">Esto es exactamente lo que le va a llegar. Puedes afinar el texto antes de mandarlo. ${v.correoValido ? `Correo: <b>${esc(v.correo)}</b>.` : `<b>No dejó un correo válido</b>, así que por ahora no se puede mandar.`}</p>
+        <p class="sub">Esto es exactamente lo que le va a llegar. Puedes afinar el texto antes de mandarlo. ${v.correoValido ? `Correo: <b>${sens(v.correo)}</b>.` : `<b>No dejó un correo válido</b>, así que por ahora no se puede mandar.`}</p>
         <div class="sondeo-cols">
           <section class="sondeo-correo">
             <h3>Correo 1 · sale ahora</h3>
@@ -1229,6 +1239,11 @@
   });
   $("#archivo").addEventListener("change", (e) => { if (e.target.files.length) importar([...e.target.files]); e.target.value = ""; });
 
+  // Privacidad: se recuerda en este navegador
+  document.body.classList.toggle("privado", guardado("talento-privado", "0") === "1");
+  const pintarPrivado = () => { const b = $("#btn-privado"); if (!b) return; const on = document.body.classList.contains("privado"); b.setAttribute("aria-pressed", on); b.title = on ? "Privacidad encendida: apellidos, teléfonos y correos difuminados" : "Encender privacidad"; };
+  pintarPrivado();
+  $("#btn-privado").addEventListener("click", () => { const on = document.body.classList.toggle("privado"); guardar("talento-privado", on ? "1" : "0"); pintarPrivado(); aviso(on ? "Privacidad encendida: solo se ven primer nombre, colonia y edad" : "Privacidad apagada"); });
   st.vista = guardado("talento-vista", "tarjetas");
   st.puesto = guardado("talento-puesto", "domestica");
   escala(0);
@@ -1236,7 +1251,7 @@
   // RLR · lo que usan las otras pantallas (pantallas.js)
   window.Talento = { st, $, $$, esc, fecha, hace, dias, tel, primer, iniciales, api, aviso, guardarMarca, abrir, repintar, anchos, waBoton, marcasHTML, veredicto, medidores,
     P, PC, selectorPuestos, usarPuesto, ETAPAS, ETAPA_NOMBRE, ESTADOS, opcionMensaje, textoMensaje, editarMensaje, importar, evaluar, sincronizar, nombreDe, cargar, ir,
-    marcaDe, etapaDe, etapaPastilla, etiquetasHTML, etiquetasDe, sondeoHTML, sondeoDe, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
+    marcaDe, etapaDe, etapaPastilla, etiquetasHTML, etiquetasDe, sondeoHTML, sondeoDe, nombreHTML, priv, sens, noDisponible, reciente, ICONO_WA, wa, guardado, guardar, medidoresDe, nombreFormulario };
   cargar().catch(() => {});
 })();
 /* fin · RLR · Ricardo López Reyero */

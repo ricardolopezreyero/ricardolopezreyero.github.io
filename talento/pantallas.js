@@ -57,7 +57,7 @@
     const desde = m.cuando && etapa ? dias(m.cuando) : dias(c.ultimo_envio);
     const p = T.PC(c);
     return `<article class="kcard ${etapa === "contratada" ? "contratada" : ""}" draggable="true" data-id="${c.id}" data-etapa="${etapa}">
-      <div class="k-cab"><span class="avatar chico n${c.nivel}">${esc(T.iniciales(c.nombre))}</span><span class="k-nombre">${m.favorita ? "★ " : ""}${esc(c.nombre)}${T.etiquetasHTML(c, true)}</span><span class="k-puntos tab">${c.puntos ?? "—"}</span></div>
+      <div class="k-cab"><span class="avatar chico n${c.nivel}">${esc(T.iniciales(c.nombre))}</span><span class="k-nombre">${m.favorita ? "★ " : ""}${T.nombreHTML(c.nombre)}${T.etiquetasHTML(c, true)}</span><span class="k-puntos tab">${c.puntos ?? "—"}</span></div>
       <div class="k-meta">${st.puesto === "*" ? `<span class="insignia">${esc(p.corto || p.nombre)}</span>` : ""}<span class="veredicto v-${c.nivel}">${veredicto(c).corto}</span><span>${desde == null ? "" : desde < 1 ? "hoy" : `${desde} d${etapa ? " en esta etapa" : " desde que llenó"}`}</span></div>
       <div class="k-acciones">${waBoton(c, "btn-verde", ICONO_WA)}<button class="btn btn-fantasma" data-abrir="${c.id}">Ficha</button>
         <span class="k-mover">${etapa === "descartada" ? `<button type="button" data-mover="${c.id}" data-a="" title="Regresar a nuevas">↩</button>` : `<button type="button" data-mover="${c.id}" data-a="${i > 0 ? ETAPAS[i - 1][0] : ""}" ${i <= 0 ? "disabled" : ""} title="Regresar">←</button><button type="button" data-mover="${c.id}" data-a="${i < ETAPAS.length - 1 ? ETAPAS[i + 1][0] : ""}" ${i >= ETAPAS.length - 1 ? "disabled" : ""} title="Avanzar">→</button><button type="button" data-mover="${c.id}" data-a="descartada" title="Descartar">✕</button>`}</span></div>
@@ -247,8 +247,8 @@
   function comoLoDecidieron(p) {
     const d = (st.deliberaciones || []).find((x) => x.puesto === p.id);
     if (!d) return "";
-    const nom = (id) => (st.porId[id] || { nombre: id }).nombre;
-    const pos = (r) => r.error ? `<i>falló: ${esc(r.error)}</i>` : `listas: ${esc(nom(r.listas[0].id))} y ${esc(nom(r.listas[1].id))} · empáticas: ${esc(nom(r.empaticas[0].id))} y ${esc(nom(r.empaticas[1].id))}${r.nota ? `<br><span class="quien">${esc(r.nota)}</span>` : ""}`;
+    const nom = (id) => T.nombreHTML((st.porId[id] || { nombre: id }).nombre);
+    const pos = (r) => r.error ? `<i>falló: ${esc(r.error)}</i>` : `listas: ${nom(r.listas[0].id)} y ${nom(r.listas[1].id)} · empáticas: ${nom(r.empaticas[0].id)} y ${nom(r.empaticas[1].id)}${r.nota ? `<br><span class="quien">${T.priv(r.nota)}</span>` : ""}`;
     const COMO = { acuerdo: "Coincidieron a la primera", reconsideracion: "Se pusieron de acuerdo tras leerse", conteo: "No coincidieron del todo: se sumaron sus votos", "un-solo-motor": "Solo pudo opinar una de las dos" };
     return `<details class="delib"><summary>🧠💛 Cómo lo decidieron DeepSeek y Claude · ${esc(COMO[d.resultado.como] || d.resultado.como)} · ${fecha(d.cuando)}</summary>
       <p class="g-sub">Leyeron las ${d.leidas} solicitudes del puesto, cada uno por su lado.</p>
