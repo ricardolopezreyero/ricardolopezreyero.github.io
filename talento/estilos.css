@@ -650,6 +650,9 @@ body.compartida { background: var(--blue-soft); }
 @media (max-width: 760px) { .preg-fila { grid-template-columns: 1fr; } .medidores-editor { grid-template-columns: 1fr 1fr; } .embudo-resumen { grid-template-columns: repeat(5, 140px); } }
 
 /* ─── Entradas ─── */
+.sms-estado { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: .72rem; font-weight: 700; background: #fff6d6; color: #8a5a00; }
+.sms-estado.bien { background: #e3f7e8; color: #0a7a0a; }
+.sms-estado.mal { background: #fff1f3; color: #b4232c; }
 .bitacora-tabla { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .bitacora-tabla td { padding: 8px 10px; border-top: .5px solid var(--border); vertical-align: top; }
 .bitacora-tabla td:first-child { font-weight: 700; color: var(--navy); white-space: nowrap; }

@@ -148,7 +148,7 @@
       const mismoDia = cuando.toDateString() === hoy.toDateString();
       const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
       const etq = `${mismoDia ? "hoy" : cuando.toDateString() === manana.toDateString() ? "mañana" : fecha(cuando.toISOString())} ${cuando.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}`;
-      return `<span class="sondeo-pill espera" title="Toques enviados: ${s.paso} de 4. Los avisos solo salen de lunes a sábado de 9 a 19.">✉ Preguntada ${hace(s.creado)} · ${s.paso < 4 ? `aviso ${s.paso + 1} ${etq}` : "último aviso enviado"}</span>${largo ? `<small class="quien">${s.envios.map((e) => `${e.canal === "sms" ? "SMS" : "Correo"} ${e.paso}${e.error ? ` falló (${esc(e.error)})` : " ✓"}`).join(" · ")}</small>` : ""}`;
+      return `<span class="sondeo-pill espera" title="Toques enviados: ${s.paso} de 4. Los avisos solo salen de lunes a sábado de 9 a 19.">✉ Preguntada ${hace(s.creado)} · ${s.paso < 4 ? `aviso ${s.paso + 1} ${etq}` : "último aviso enviado"}</span>${largo ? `<small class="quien">${s.envios.map((e) => `${e.canal === "sms" ? "SMS" : "Correo"} ${e.paso}${e.error ? ` falló (${esc(e.error)})` : e.estado ? ` ${esc(e.estado)}` : " ✓"}`).join(" · ")}</small>` : ""}`;
     }
     if (s) return `<span class="sondeo-pill no">Sin respuesta tras 4 avisos</span>${largo ? `<button type="button" class="btn btn-contorno btn-chico" data-sondeo="${c.id}">Volver a preguntar</button>` : ""}`;
     if (!correoValido(c.correo)) return largo ? `<small class="quien">No dejó correo: por ahora el sondeo solo va por correo.</small>` : "";

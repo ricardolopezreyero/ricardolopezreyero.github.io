@@ -384,13 +384,24 @@
 
   /* ═══ ENTRADAS ═══ */
   async function entradas(v) {
-    v.innerHTML = `<section class="cab"><div><div class="eyebrow">Solo Ricardo</div><h1>Entradas y sincronizaciones</h1><p class="sub">Quién entró, qué importó y qué trajo el reloj del CRM.</p></div></section><div class="grafica" id="bitacora-caja">Cargando…</div>`;
+    v.innerHTML = `<section class="cab"><div><div class="eyebrow">Solo Ricardo</div><h1>Entradas y sincronizaciones</h1><p class="sub">Quién entró, qué importó, qué trajo el reloj del CRM y qué SMS fueron y vinieron.</p></div></section><div class="grafica" id="sms-caja"></div><div class="grafica" id="bitacora-caja">Cargando…</div>`;
     try {
       const d = await api("/api/bitacora");
       const acc = { "entró": "Entró", "importó": "Subió un archivo", "sincronizó": "Sincronizó con el CRM", "contrató": "Contrató", "compartió": "Compartió una ficha", "puesto": "Editó un puesto" };
-      $("#bitacora-caja").innerHTML = `<table class="bitacora-tabla">${d.bitacora.map((b) => `<tr><td>${esc(nombreDe(b.quien))}</td><td>${esc(acc[b.accion] || b.accion)}</td><td>${new Date(b.cuando).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</td><td>${esc(b.accion === "entró" ? b.detalle : b.accion === "contrató" ? (st.porId[b.detalle] || { nombre: "" }).nombre : b.accion === "sincronizó" ? resumenSync(b.detalle) : b.accion === "importó" ? resumenImport(b.detalle) : "")}</td></tr>`).join("") || "<tr><td>Sin registros</td></tr>"}</table>`;
+      const acc2 = { ...acc, "sondeó": "Preguntó disponibilidad", "sms": "Contestó por SMS", "dijo que sí": "Dijo que sí", "dijo que no": "Dijo que no" };
+      $("#bitacora-caja").innerHTML = `<table class="bitacora-tabla">${d.bitacora.map((b) => `<tr><td>${esc(nombreDe(b.quien))}</td><td>${esc(acc2[b.accion] || b.accion)}</td><td>${new Date(b.cuando).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</td><td>${esc(b.accion === "entró" ? b.detalle : ["contrató", "sondeó", "dijo que sí", "dijo que no"].includes(b.accion) ? (st.porId[b.detalle] || { nombre: "" }).nombre : b.accion === "sincronizó" ? resumenSync(b.detalle) : b.accion === "importó" ? resumenImport(b.detalle) : b.accion === "sms" ? resumenSMS(b.detalle) : "")}</td></tr>`).join("") || "<tr><td>Sin registros</td></tr>"}</table>`;
+      $("#sms-caja").innerHTML = smsHTML(d);
     } catch { $("#bitacora-caja").textContent = "No se pudo leer la bitácora."; }
   }
+  const resumenSMS = (t) => { try { const d = JSON.parse(t); return `${d.id && st.porId[d.id] ? st.porId[d.id].nombre : `celular ${d.de || ""}`}: «${d.texto || ""}»${d.interpretado ? ` → ${d.interpretado === "si" ? "sí" : "no"}` : " (no se entendió como sí/no)"}`; } catch { return ""; } };
+  // RLR · SMS de ida y vuelta por Telnyx, con su acuse de entrega
+  const smsHTML = (d) => {
+    const lista = d.sms || [], t = d.telnyx || {};
+    const quien = (x) => x.candidata && st.porId[x.candidata] ? T.nombreHTML(st.porId[x.candidata]) : esc(T.sens(x.direccion === "entrante" ? x.de : x.para));
+    const pill = (e) => `<span class="sms-estado ${/entregado|recibido/.test(e) ? "bien" : /fall/.test(e) ? "mal" : ""}">${esc(e || "")}</span>`;
+    return `<h3>SMS por Telnyx</h3><p class="quien">Número de la casa ${esc(t.numero || "—")}${t.alfa ? ` · remitente de respaldo ${esc(t.alfa)}` : ""} · webhook ${t.llave_publica ? "con firma verificada" : "sin llave pública"}. Aquí se ven las entregas, las fallas y lo que contestan por SMS.</p>
+      ${lista.length ? `<table class="sync-tabla"><tr><th>Cuándo</th><th></th><th>Quién</th><th>Texto</th><th>Estado</th></tr>${lista.map((x) => `<tr><td>${new Date(x.cuando).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</td><td>${x.direccion === "entrante" ? "↙ recibido" : "↗ enviado"}</td><td>${quien(x)}</td><td>${esc(String(x.texto || "").slice(0, 140))}${x.interpretado ? ` <b>→ ${x.interpretado === "si" ? "sí" : "no"}</b>` : ""}</td><td>${pill(x.estado)}${x.error ? `<br><small class="quien">${esc(x.error)}</small>` : ""}</td></tr>`).join("")}</table>` : `<p class="quien">Todavía no ha salido ni llegado ningún SMS.</p>`}`;
+  };
   const resumenSync = (t) => { try { const d = JSON.parse(t); if (d.error) return d.mensaje || d.error; return (d.puestos || []).map((p) => `${(st.porPuesto[p.puesto] || { nombre: p.puesto }).nombre}: ${p.error || `${p.nuevas} nuevas, ${p.volvieron} volvieron`}`).join(" · "); } catch { return ""; } };
   const resumenImport = (t) => { try { const d = JSON.parse(t); return `${(st.porPuesto[d.puesto] || { nombre: d.puesto || "" }).nombre}: ${d.nuevas} nuevas, ${d.volvieron} volvieron, ${d.sinCambio} sin cambio`; } catch { return ""; } };
 
