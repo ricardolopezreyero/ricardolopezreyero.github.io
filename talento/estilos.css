@@ -734,3 +734,13 @@ body.privado .privado { filter: blur(5px); user-select: none; -webkit-user-selec
 .cv-condiciones { display: grid; gap: 6px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
 .cv-aviso { font-size: .76rem; color: #a4401a; }
 .cv-aviso .liga { background: none; border: 0; padding: 0; color: var(--blue); font-weight: 700; text-decoration: underline; font-size: inherit; }
+
+/* ─── Compartir (Puestos) ─── */
+.compartir { border: .5px solid var(--border); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; background: var(--blue-soft); }
+.compartir-cab { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.compartir-cab b { font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--blue); }
+.liga-fila { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 10px; background: #fff; border: .5px solid var(--border); border-radius: 10px; }
+.liga-t { font-size: .72rem; font-weight: 700; color: var(--muted); }
+.liga-url { font-size: .82rem; font-weight: 600; color: var(--navy); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liga-acciones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.liga-acciones .btn { min-height: 2rem; padding: 0 .7rem; font-size: .76rem; }

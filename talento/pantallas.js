@@ -239,9 +239,20 @@
       ${(st.etiquetas || []).some((e) => e.puesto === p.id) ? `<div class="insignias">${(st.etiquetas || []).filter((e) => e.puesto === p.id).map((e) => { const c = st.porId[e.id]; return c ? `<span class="etq etq-${e.etiqueta} chica" title="${esc(e.motivo || "")}">${e.etiqueta === "lista" ? "🧠" : "💛"} ${e.orden || 1} · ${esc(T.primer(c.nombre))}</span>` : ""; }).join("")}</div>` : (l.length >= 100 ? "" : `<small class="quien">Las etiquetas «más lista» y «más empática» aparecen a partir de 100 candidatas.</small>`)}
       ${comoLoDecidieron(p)}
       <div class="pc-cifras"><span><b>${l.length}</b>candidatas</span><span><b>${a}</b>para llamar</span><span><b>${proceso}</b>en proceso</span><span><b>${contr}</b>contratadas</span></div>
-      <div class="pc-forms">${(p.formularios || []).map((f) => `<a href="https://link.superleads.mx/widget/form/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.nombre || f.id)} ↗</a>`).join("") || `<span class="quien">Sin formulario ligado</span>`}</div>
+      ${compartirHTML(p)}
       <div class="pc-acciones"><button class="btn btn-navy btn-chico" data-ver-puesto="${p.id}">Ver candidatas</button>${st.yo.admin ? `<button class="btn btn-contorno btn-chico" data-editar-puesto="${p.id}">Editar</button><button class="btn btn-fantasma btn-chico" data-sync-puesto="${p.id}">↻ Traer</button>` : ""}</div>
     </article>`;
+  }
+  // RLR · Compartir: la página y el formulario de cada puesto, para copiar o mandar por WhatsApp
+  function ligaHTML(titulo, url, mensaje) {
+    return `<div class="liga-fila"><span class="liga-t">${esc(titulo)}</span><a class="liga-url" href="${esc(url)}" target="_blank" rel="noopener" title="${esc(url)}">${esc(url.replace(/^https?:\/\//, ""))}</a>
+      <span class="liga-acciones"><button type="button" class="btn btn-contorno btn-chico" data-copiar-liga="${esc(url)}">Copiar</button><a class="btn btn-navy btn-chico" href="https://wa.me/?text=${encodeURIComponent(`${mensaje} ${url}`)}" target="_blank" rel="noopener">${ICONO_WA}WhatsApp</a></span></div>`;
+  }
+  function compartirHTML(p) {
+    const filas = [];
+    if (p.pagina) filas.push(ligaHTML("Página de la vacante", p.pagina, `Te comparto la vacante de ${p.nombre.toLowerCase()} en Torreón. Aquí están los detalles y la solicitud:`));
+    for (const f of p.formularios || []) filas.push(ligaHTML((p.formularios.length > 1 ? `Formulario · ${f.nombre || f.id}` : "Formulario de solicitud"), `https://link.superleads.mx/widget/form/${f.id}`, `Te comparto la solicitud para ${p.nombre.toLowerCase()} en Torreón:`));
+    return `<div class="compartir"><div class="compartir-cab"><b>Compartir</b><span class="quien">Copia la liga o mándala por WhatsApp</span></div>${filas.join("") || `<span class="quien">Sin página ni formulario ligados.</span>`}</div>`;
   }
   // RLR · el debate entre DeepSeek y Claude que decidió las etiquetas del puesto
   function comoLoDecidieron(p) {
@@ -269,7 +280,10 @@
         <div class="campo"><label>Orden</label><input name="orden" type="number" min="1" max="99" value="${p ? p.orden : st.puestos.length + 1}"></div>
       </div>
       <div class="campo"><label>El arreglo, en una o dos frases (horario y qué se ofrece)</label><textarea name="descripcion" rows="2" maxlength="600" class="entrada-texto">${p ? esc(p.descripcion) : ""}</textarea></div>
-      <div class="campo"><label>Sueldo o mínimo para filtrar (se le recuerda a la candidata en el sondeo)</label><input name="sueldo" maxlength="120" value="${p ? esc(p.sueldo || "") : ""}" placeholder="Ej. $1,900 MXN a la semana + IMSS"></div>
+      <div class="campos-fila">
+        <div class="campo"><label>Sueldo o mínimo para filtrar (se le recuerda a la candidata en el sondeo)</label><input name="sueldo" maxlength="120" value="${p ? esc(p.sueldo || "") : ""}" placeholder="Ej. $1,900 MXN a la semana + IMSS"></div>
+        <div class="campo"><label>Página pública de la vacante</label><input name="pagina" maxlength="200" value="${p ? esc(p.pagina || "") : ""}" placeholder="https://perfil.capitaltorreon.com/…"><small>Se comparte desde aquí y se liga en la página de gracias del sondeo.</small></div>
+      </div>
       <div class="campo"><label>Formulario del CRM</label>
         <div class="campos-fila"><input name="formulario_id" maxlength="40" value="${forms[0] ? esc(forms[0].id) : ""}" placeholder="Id del formulario (está en la liga link.superleads.mx/widget/form/…)" ${p && p.enCodigo ? "readonly" : ""}><button type="button" class="btn btn-contorno btn-chico" id="btn-leer-form" ${p && p.enCodigo ? "disabled" : ""}>Leer sus preguntas</button></div>
         <small>${forms.length > 1 ? `Este puesto lee ${forms.length} formularios: ${forms.map((f) => esc(f.nombre)).join(" · ")}.` : "Al leerlo se proponen las preguntas; ajusta la clave corta de cada una si quieres."}</small></div>
@@ -302,7 +316,7 @@
     const formId = f.formulario_id.value.trim();
     const cuerpo = {
       id, nombre: f.nombre.value.trim(), corto: f.corto.value.trim(), prefijo: f.prefijo.value.trim(), orden: Number(f.orden.value) || undefined,
-      descripcion: f.descripcion.value.trim(), sueldo: f.sueldo.value.trim(), activo: f.activo ? f.activo.checked : undefined,
+      descripcion: f.descripcion.value.trim(), sueldo: f.sueldo.value.trim(), pagina: f.pagina.value.trim(), activo: f.activo ? f.activo.checked : undefined,
       formularios: prev && prev.enCodigo ? prev.formularios : (formId ? [{ id: formId, nombre: f.dataset.formNombre || (prev && prev.formularios[0] && prev.formularios[0].id === formId ? prev.formularios[0].nombre : f.nombre.value.trim()) }] : []),
       preguntas: $$(".preg-fila", f).map((r) => ({ id: r.dataset.id, etiqueta: r.querySelector(".etq").title, clave: r.querySelector("[data-clave]").value.trim(), corta: r.querySelector("[data-corta]").value.trim() })),
       rubrica: { medidores: [0, 1, 2, 3, 4].map((i) => [f[`med_n_${i}`].value.trim(), "", Number(f[`med_m_${i}`].value)]), contexto: f.contexto.value.trim(), exp_auto: f.exp_auto.checked },
@@ -383,6 +397,8 @@
   /* ═══ eventos propios de estas pantallas ═══ */
   document.addEventListener("click", (ev) => {
     const t = ev.target;
+    const bCop = t.closest("[data-copiar-liga]");
+    if (bCop) { ev.stopPropagation(); const u = bCop.dataset.copiarLiga; navigator.clipboard.writeText(u).then(() => aviso("Liga copiada")).catch(() => aviso(u, 8000)); return; }
     const bMover = t.closest("[data-mover]");
     if (bMover) { ev.stopPropagation(); mover(bMover.dataset.mover, bMover.dataset.a); return; }
     const bVer = t.closest("[data-ver-puesto]");
