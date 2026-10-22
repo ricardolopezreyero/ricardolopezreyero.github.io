@@ -134,8 +134,11 @@
     const s = sondeoDe(c);
     if (s && s.respuesta) return `<span class="sondeo-pill ${s.respuesta === "si" ? "si" : "no"}" title="Contestó el ${fecha(s.respondido)} por ${s.canal === "sms" ? "SMS" : "correo"}">${s.respuesta === "si" ? "💚 Dijo que sí está abierta" : "🙏 Dijo que por ahora no"}${largo ? ` · ${fecha(s.respondido)}` : ""}</span>${largo && s.respuesta === "si" ? `<small class="quien">Le prometimos que le escribirías por WhatsApp.</small>` : ""}`;
     if (s && s.siguiente) {
-      const sig = Math.max(0, Math.round((new Date(s.siguiente) - Date.now()) / 3600000));
-      return `<span class="sondeo-pill espera" title="Toques enviados: ${s.paso} de 4">✉ Preguntada ${hace(s.creado)} · ${s.paso < 4 ? `aviso ${s.paso + 1} en ${sig} h` : "último aviso enviado"}</span>${largo ? `<small class="quien">${s.envios.map((e) => `${e.canal === "sms" ? "SMS" : "Correo"} ${e.paso}${e.error ? ` falló (${esc(e.error)})` : " ✓"}`).join(" · ")}</small>` : ""}`;
+      const cuando = new Date(s.siguiente), hoy = new Date();
+      const mismoDia = cuando.toDateString() === hoy.toDateString();
+      const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
+      const etq = `${mismoDia ? "hoy" : cuando.toDateString() === manana.toDateString() ? "mañana" : fecha(cuando.toISOString())} ${cuando.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}`;
+      return `<span class="sondeo-pill espera" title="Toques enviados: ${s.paso} de 4. Los avisos solo salen de lunes a sábado de 9 a 19.">✉ Preguntada ${hace(s.creado)} · ${s.paso < 4 ? `aviso ${s.paso + 1} ${etq}` : "último aviso enviado"}</span>${largo ? `<small class="quien">${s.envios.map((e) => `${e.canal === "sms" ? "SMS" : "Correo"} ${e.paso}${e.error ? ` falló (${esc(e.error)})` : " ✓"}`).join(" · ")}</small>` : ""}`;
     }
     if (s) return `<span class="sondeo-pill no">Sin respuesta tras 4 avisos</span>${largo ? `<button type="button" class="btn btn-contorno btn-chico" data-sondeo="${c.id}">Volver a preguntar</button>` : ""}`;
     if (!correoValido(c.correo)) return largo ? `<small class="quien">No dejó correo: por ahora el sondeo solo va por correo.</small>` : "";
@@ -282,7 +285,7 @@
         <div><h3>Por qué es la ${LUGARES[i]}</h3><p>${esc(c.resumen)}</p></div>
         ${c.a_favor ? `<div><h3>Lo que la hace brillar</h3><p class="tenue">${esc(c.a_favor)}</p></div>` : ""}
         ${marcasHTML(c)}
-        ${sondeoDe(c) ? `<div>${sondeoHTML(c)}</div>` : ""}
+        ${noDisponible(c) ? "" : `<div>${sondeoHTML(c)}</div>`}
       </article>`).join("") || "";
     $("#podio").classList.toggle("oculto", !tres.length);
   }
@@ -820,7 +823,7 @@
           <h2>Decisión de la casa</h2>
           <p class="sub">Lo que marquen aquí lo ve toda su casa.</p>
           ${marcasHTML(c)}
-          ${noDisponible(c) ? "" : `<div class="sondeo-caja"><b>¿Está abierta a un nuevo trabajo?</b><p>Un clic y le llega un correo suave con dos botones; no se dice quién es la familia. Si no contesta, se repite a la hora, a las 12 y a las 24 (la última también por SMS cuando haya proveedor).</p>${sondeoHTML(c, true)}${st.yo.admin ? `<button type="button" class="btn btn-fantasma btn-chico" data-sondeo-prueba="${c.id}">Probar conmigo</button>` : ""}</div>`}
+          ${noDisponible(c) ? "" : `<div class="sondeo-caja"><b>¿Está abierta a un nuevo trabajo?</b><p>Un clic y le llega un correo suave con dos botones; no se dice quién es la familia. Si no contesta, se repite tres veces, siempre en horario laboral (lunes a sábado de 9 a 19), la última también por SMS cuando haya proveedor.</p>${sondeoHTML(c, true)}${st.yo.admin ? `<button type="button" class="btn btn-fantasma btn-chico" data-sondeo-prueba="${c.id}">Probar conmigo</button>` : ""}</div>`}
           <div class="nota"><label for="nota-${c.id}">Notas de la llamada</label>
             <textarea id="nota-${c.id}" data-nota="${c.id}" placeholder="Ej. Contestó rápido, puede empezar el lunes…">${esc(m.nota || "")}</textarea>
             <small id="nota-estado-${c.id}">${m.nota && m.cuando ? `Guardado ${fecha(m.cuando)}` : "Se guarda solo"}</small></div>
