@@ -62,7 +62,7 @@
   /* ─── puestos (vienen del servidor) ─── */
   const P = () => st.porPuesto[st.puesto] || st.puestos[0] || { id: "domestica", nombre: "Empleado doméstico", corto: "Planta", preguntas: [], rubrica: { medidores: [] }, mensajes: [] };
   const PC = (c) => st.porPuesto[c.puesto] || P();
-  const TITULOS = { domestica: "Quién debería entrar a <em>la casa</em>", guia: "Quién debería ser <em>la guía</em>", finde: "Quién debería cuidar <em>el fin de semana</em>", masajista: "Quién debería dar <em>los masajes</em>" };
+  const TITULOS = { domestica: "Quién debería entrar a <em>la casa</em>", guia: "Quién debería ser <em>la guía Montessori</em>", finde: "Quién debería cuidar <em>el fin de semana</em>", masajista: "Quién debería dar <em>los masajes</em>" };
   const tituloDe = (p) => TITULOS[p.id] || `Quién debería ser <em>${esc(String(p.nombre).toLowerCase())}</em>`;
   const medidoresDe = (p) => (p.rubrica && p.rubrica.medidores) || [];
 

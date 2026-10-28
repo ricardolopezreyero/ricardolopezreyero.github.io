@@ -358,7 +358,7 @@
   const EXPLICA_PUESTO = {
     domestica: { p_limpieza: "Qué limpia primero y si sabe explicar por qué.", p_armonia: "Trato con niños, calma, gusto por servir y respeto por el ritmo de la familia.", p_cocina: "Variedad y comida que le guste a una niña." },
     finde: { p_limpieza: "Qué limpia primero y si sabe explicar por qué.", p_armonia: "Calma, gusto por servir y respeto por una familia que descansa.", p_cocina: "Comida casera para una familia con una niña." },
-    guia: { p_exp: "Docencia, SEP, Montessori, guardería, años reales con niños.", p_limpieza: "Cómo organiza la tarde y cómo entiende el desarrollo.", p_armonia: "Qué hace si la niña se frustra o llora, con ejemplos reales.", p_cocina: "Cómo se comporta dentro de un hogar.", p_seriedad: "CV, referencias con teléfono, cartas y cuidado al contestar." },
+    guia: { p_exp: "Formación o práctica Montessori (casa de niños, diplomado, AMI/AMS) primero; preescolar o guardería con niños de 3 a 6 en medio.", p_limpieza: "Mirada Montessori: ambiente preparado, seguir a la niña, independencia, libertad con límites; no entretener ni hacer por ella.", p_armonia: "Ante frustración o llanto: se agacha, nombra la emoción, espera y sostiene el límite con amabilidad; sin premios ni castigos.", p_cocina: "Confianza y discreción dentro de un hogar.", p_seriedad: "CV, referencias con teléfono, cartas y cuidado al contestar." },
     masajista: { p_exp: "Años dando masajes y lugares donde ha trabajado.", p_seriedad: "Certificaciones comprobables, CV y claridad en la tarifa.", p_limpieza: "Qué técnicas domina y cómo las explica.", p_armonia: "Automóvil propio y equipo portátil para llegar a domicilio.", p_cocina: "Presentación, puntualidad y confidencialidad." },
   };
   function como(v) {
