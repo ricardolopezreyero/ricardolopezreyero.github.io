@@ -275,10 +275,13 @@
   }
 
   function pintarPodio() {
-    const tres = st.lista.filter((c) => c.nivel === "A").slice(0, 3);
-    const n = st.total, extra = Math.max(0, st.lista.filter((c) => c.nivel === "A").length - 3);
+    // Las tres mejores del lote: las de «llamar primero» y, si no las hay, las mejores que haya (la lista ya viene ordenada)
+    const buenas = st.lista.filter((c) => c.nivel === "A").length;
+    const tres = st.lista.filter((c) => c.nivel !== "P" && !c.descartada && c.nivel !== "D").slice(0, 3);
+    const n = st.total, extra = Math.max(0, buenas - 3);
     const pend = st.lista.filter((c) => c.nivel === "P").length;
-    $("#hero-sub").textContent = n ? `${n} candidatas ordenadas de mejor a peor.${tres.length ? ` Estas ${tres.length === 1 ? "es la que" : "son las que"} yo llamaría primero.` : ""}${extra ? ` Otras ${extra} también valen la llamada.` : ""}${pend ? ` Hay ${pend} nuevas por evaluar.` : ""}` : pend ? `${pend} candidatas nuevas por evaluar.` : "Todavía no llegan candidatas a este puesto.";
+    const frase = !tres.length ? "" : buenas ? ` Estas ${tres.length === 1 ? "es la que" : "son las que"} yo llamaría primero.` : ` Ninguna llega a «llamar primero» con esta rúbrica; estas son las ${tres.length === 1 ? "mejor" : "mejores"} del lote y valen la llamada.`;
+    $("#hero-sub").textContent = n ? `${n} candidatas ordenadas de mejor a peor.${frase}${extra ? ` Otras ${extra} también valen la llamada.` : ""}${pend ? ` Hay ${pend} nuevas por evaluar.` : ""}` : pend ? `${pend} candidatas nuevas por evaluar.` : "Todavía no llegan candidatas a este puesto.";
     $("#podio").innerHTML = tres.map((c, i) => `
       <article class="ficha ${noDisponible(c) ? "contratada" : ""}" data-id="${c.id}">
         <div class="ficha-lugar"><b>${i + 1}</b><span>${LUGARES[i]} opción · ${c.puntos} puntos</span></div>
